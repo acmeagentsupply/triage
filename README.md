@@ -1,6 +1,6 @@
 # OCTriageUnit
 
-![Control Plane Trusted](docs/assets/control-plane-trusted.svg)
+![Control Plane Trusted](docs/assets/control-plane-trusted.svg) ![Read-Only Verified](docs/assets/read-only-verified.svg)
 
 OCTriageUnit is a public, read-only OpenClaw control plane triage tool for operators who need fast local diagnostics without changing system state. It is designed for degraded environments where safety matters more than convenience: the script gathers evidence, records what it found into a proof bundle under the operator's home directory, and keeps all work on the local machine so findings can be reviewed, reproduced, and shared without hidden behavior.
 
@@ -54,6 +54,13 @@ Review the full trust posture in [docs/trust-doctrine.md](/Users/AGENT/octriageu
 ## Threat Model
 
 OCTriageUnit reads local process and platform state through operator-invoked system tools, then writes diagnostic artifacts into a local proof bundle. It cannot repair services, rotate credentials, validate remote cluster state, or guarantee correctness of external binaries already present on the machine. The trust boundary is the local host: operators must trust the local shell, the installed `launchctl` and `openclaw` binaries, and the visible source code they are executing.
+
+## Operator Notes
+
+- **OCTriageUnit is read-only by design:** it collects diagnostics and writes a timestamped bundle locally. It never modifies config, restarts services, or touches anything outside `~/octriage-bundles/`.
+- **If a command hangs in degraded states**, the triage runner times out and continues — it should never stall your recovery workflow.
+- **Treat bundles as sensitive:** they may contain hostnames, paths, and operational metadata. Redact before sharing externally.
+
 
 ## License
 
