@@ -48,10 +48,31 @@ bash scripts/install.sh --verify-from-source
 **Uninstall:**
 
 ```bash
-bash scripts/install.sh --uninstall
+curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/scripts/uninstall.sh | bash
 # or see UNINSTALL.md for manual steps
 ```
 
+## After Install
+
+Confirm a successful install by running:
+
+```bash
+octriageunit -self-test
+```
+
+The primary interface is the **CLI** (`octriageunit`). The `.app` bundle (included in the release zip) is an optional convenience surface that opens a terminal window and launches the CLI — it is not required.
+
+> **If the app is not visible in Applications**, the CLI install is still valid and fully functional.
+
+## Where Files Are Installed
+
+| Item | Path |
+|---|---|
+| CLI binary | `/usr/local/bin/octriageunit` (system) or `~/.local/bin/octriageunit` (user) |
+| App bundle | `~/Applications/OCTriageUnit.app` (optional, release zip only) |
+| Proof bundles | `~/octriage-bundles/<timestamp>/` |
+
+The installer installs the **CLI only**. The app bundle is distributed separately in the release zip for operators who want it.
 
 ## Usage
 
