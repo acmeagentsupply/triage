@@ -109,17 +109,17 @@ EOF
 main() {
   # SAFE: Orchestrates local argument parsing and proof-bundle setup only; contains no service control or network behavior.
   case "${1-}" in
-    --help|-h)
+    --help|-help|-h)
       print_help
       return 0
       ;;
-    --version)
+    --version|-version)
       local ver
       ver="$(cat "${VERSION_FILE}" 2>/dev/null || echo "${EMBEDDED_VERSION}")"
       printf 'octriageunit %s\n' "${ver}"
       return 0
       ;;
-    --self-test)
+    --self-test|-self-test)
       printf 'Self-test: checking syntax and flags...\n'
       bash -n "${BASH_SOURCE[0]}" && printf '  ✓ syntax OK\n'
       printf '  ✓ --version: %s\n' "$(cat "${VERSION_FILE}" 2>/dev/null || echo "${EMBEDDED_VERSION}")"
