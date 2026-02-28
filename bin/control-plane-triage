@@ -10,6 +10,7 @@ set -u
 readonly BUNDLE_ROOT="${HOME}/octriage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
+readonly EMBEDDED_VERSION="0.1.0"   # injected at install time if standalone
 
 print_help() {
   # SAFE: Prints local help text only; does not inspect services, mutate config, or access the network.
@@ -114,14 +115,14 @@ main() {
       ;;
     --version)
       local ver
-      ver="$(cat "${VERSION_FILE}" 2>/dev/null || echo "unknown")"
+      ver="$(cat "${VERSION_FILE}" 2>/dev/null || echo "${EMBEDDED_VERSION}")"
       printf 'octriageunit %s\n' "${ver}"
       return 0
       ;;
     --self-test)
       printf 'Self-test: checking syntax and flags...\n'
       bash -n "${BASH_SOURCE[0]}" && printf '  ✓ syntax OK\n'
-      printf '  ✓ --version: %s\n' "$(cat "${VERSION_FILE}" 2>/dev/null || echo "unknown")"
+      printf '  ✓ --version: %s\n' "$(cat "${VERSION_FILE}" 2>/dev/null || echo "${EMBEDDED_VERSION}")"
       printf '  ✓ --help: ' && print_help | grep -q "Read-only" && printf 'safety guarantees present\n'
       printf 'Self-test PASSED\n'
       return 0
