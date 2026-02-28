@@ -102,10 +102,7 @@ do_install() {
   mkdir -p "$prefix" || die "Cannot create directory: ${prefix}"
   cp "$SRC" "$dest"   || die "Cannot copy to: ${dest}"
   chmod +x "$dest"    || die "Cannot chmod: ${dest}"
-  # Stamp version into installed copy so --version works standalone
-  local ver; ver="$(version)"
-  sed -i.bak "s/^readonly EMBEDDED_VERSION=.*/readonly EMBEDDED_VERSION=\"${ver}\"   # stamped by installer/" "$dest" 2>/dev/null || true
-  rm -f "${dest}.bak" 2>/dev/null || true
+  # Version is embedded as EMBEDDED_VERSION constant in source — no post-copy mutation
 
   ok "Installed: ${dest}"
   ok "Version:   $(version)"
