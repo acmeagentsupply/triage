@@ -6,7 +6,7 @@
 #
 # SAFE: never modifies system config, restarts services, or writes outside install dir.
 
-set -uo pipefail
+set -eo pipefail
 
 REPO="https://github.com/CHE10X/octriageunit.git"
 RAW="https://raw.githubusercontent.com/CHE10X/octriageunit/main"
@@ -48,7 +48,7 @@ print_header() {
 # ── Detect execution context ─────────────────────────────────────────────────
 
 # BASH_SOURCE[0] is empty/unset when the script is piped from curl
-SCRIPT_FILE="${BASH_SOURCE[0]:-}"
+SCRIPT_FILE="${BASH_SOURCE:-}" ; SCRIPT_FILE="${SCRIPT_FILE%% *}"
 REPO_ROOT=""
 if [[ -n "$SCRIPT_FILE" && -f "$SCRIPT_FILE" ]]; then
   REPO_ROOT="$(cd "$(dirname "$SCRIPT_FILE")/.." 2>/dev/null && pwd)" || REPO_ROOT=""
