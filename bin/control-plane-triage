@@ -76,6 +76,17 @@ EOF
 Triage collection TODO: capture local openclaw doctor output here.
 EOF
 
+  # Gateway healthcheck snapshot (HEALTHCHECK UNIT — A-HC-001)
+  local gw_health_dir="${HOME}/openclaw/health"
+  if [[ -f "${gw_health_dir}/gateway_health.txt" ]]; then
+    cp "${gw_health_dir}/gateway_health.txt" "${bundle_dir}/gateway_health.txt" 2>/dev/null || true
+    cp "${gw_health_dir}/gateway_health.json" "${bundle_dir}/gateway_health.json" 2>/dev/null || true
+    printf 'Gateway health snapshot included.\n'
+  else
+    printf 'gateway_health files not found (healthcheck agent not running?)\n' \
+      > "${bundle_dir}/gateway_health.txt"
+  fi
+
   if command -v shasum >/dev/null 2>&1; then
     (
       cd "${bundle_dir}" || exit 1
