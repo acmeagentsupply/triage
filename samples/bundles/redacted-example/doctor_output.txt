@@ -1,0 +1,2 @@
+Triage collection TODO: capture local openclaw doctor output here.
+[This field is populated by future triage modules — see docs/proof-bundle-format.md]

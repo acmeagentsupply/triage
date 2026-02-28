@@ -1,0 +1,8 @@
+{
+  "status": "OK",
+  "reason": "connected_42ms",
+  "ts": "2026-01-01T17:00:00Z",
+  "latency_ms": 42,
+  "probe_exit": 0,
+  "source": "openclaw-gateway-healthcheck"
+}

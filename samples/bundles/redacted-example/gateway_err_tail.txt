@@ -1,0 +1,4 @@
+--- last 50 lines of gateway.err.log ---
+2026-01-01T17:00:01.000Z [info] gateway started pid=[REDACTED]
+2026-01-01T17:00:02.000Z [ws] session opened session=[REDACTED] remote=127.0.0.1
+2026-01-01T17:00:03.000Z [info] channel whatsapp connected

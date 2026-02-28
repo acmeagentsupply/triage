@@ -1,0 +1,9 @@
+--- launchctl list (openclaw services) ---
+PID   Status  Label
+-     0       ai.openclaw.gateway
+-     0       ai.openclaw.gateway_healthcheck
+[REDACTED]    0       ai.openclaw.hendrik_watchdog
+--- launchctl print (gateway) ---
+path = /Users/[REDACTED]/Library/LaunchAgents/ai.openclaw.gateway.plist
+state = not running
+last exit code = 0
