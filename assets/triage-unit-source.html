@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCTriageUnit — Triage Unit v4.4</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #e8e4dc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+  }
+
+  .scene {
+    position: relative;
+    width: 500px;
+    height: 500px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .device {
+    position: relative;
+    width: 260px;
+    height: 340px;
+    background: linear-gradient(145deg, #7a7f85, #5c6168, #6b7078);
+    border-radius: 18px;
+    box-shadow:
+      0 20px 60px rgba(0,0,0,0.45),
+      0 4px 8px rgba(0,0,0,0.3),
+      inset 0 1px 0 rgba(255,255,255,0.15);
+    transform: rotate(-4deg);
+    transition: transform 0.3s ease;
+  }
+
+  .device:hover { transform: rotate(-2deg) scale(1.02); }
+
+  /* Screen */
+  .screen {
+    position: absolute;
+    top: 24px;
+    left: 18px;
+    right: 18px;
+    height: 160px;
+    background: #0a0c08;
+    border-radius: 6px;
+    border: 2px solid #2a2e2a;
+    overflow: hidden;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+  }
+
+  .screen-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    padding: 10px 12px;
+  }
+
+  /* Scan line flicker */
+  .screen-inner::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: rgba(255,200,0,0.06);
+    animation: scanline 4s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes scanline {
+    0%   { top: 0; }
+    100% { top: 100%; }
+  }
+
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .label-triage {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: #c8a830;
+    font-weight: bold;
+    text-transform: uppercase;
+    opacity: 0;
+    animation: bootFade 0.4s ease 0.8s forwards;
+  }
+
+  .status-dot {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 7px;
+    color: #6adb6a;
+    letter-spacing: 1px;
+    opacity: 0;
+    animation: bootFade 0.4s ease 1.2s forwards;
+  }
+
+  .dot {
+    width: 5px;
+    height: 5px;
+    background: #4ade4a;
+    border-radius: 50%;
+    box-shadow: 0 0 6px #4ade4a;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 6px #4ade4a; }
+    50%       { opacity: 0.6; box-shadow: 0 0 2px #4ade4a; }
+  }
+
+  /* Waveform canvas */
+  .waveform-wrap {
+    height: 52px;
+    position: relative;
+    opacity: 0;
+    animation: bootFade 0.4s ease 1.6s forwards;
+  }
+  canvas.waveform {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Score */
+  .score-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 8px;
+    opacity: 0;
+    animation: bootFade 0.4s ease 2.0s forwards;
+  }
+  .score-num {
+    font-size: 36px;
+    font-weight: bold;
+    color: #f0c040;
+    line-height: 1;
+    font-family: 'Courier New', monospace;
+    text-shadow: 0 0 12px rgba(240,192,64,0.6);
+    animation: scoreCount 1.5s ease 2.2s both;
+  }
+  @keyframes scoreCount {
+    from { opacity: 0.3; }
+    to   { opacity: 1; }
+  }
+  .score-denom { font-size: 11px; color: #8a7a40; }
+  .score-badge {
+    margin-left: 6px;
+    font-size: 7px;
+    letter-spacing: 2px;
+    border: 1px solid #c8a830;
+    color: #c8a830;
+    padding: 2px 6px;
+    border-radius: 2px;
+  }
+
+  /* Status LEDs */
+  .leds {
+    position: absolute;
+    left: 20px;
+    top: 196px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .led-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    animation: bootFade 0.3s ease var(--delay) forwards;
+  }
+  .led {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+  }
+  .led.green  { background: #4ade4a; box-shadow: 0 0 5px #4ade4a; }
+  .led.amber  { background: #f0a020; box-shadow: 0 0 5px #f0a020; animation: amberBlink 3s ease-in-out infinite; }
+  .led.red    { background: #e04040; box-shadow: 0 0 5px #e04040; }
+  @keyframes amberBlink {
+    0%, 90%, 100% { opacity: 1; }
+    95% { opacity: 0.3; }
+  }
+  .led-label { font-size: 6px; color: #7a8090; letter-spacing: 1px; }
+
+  /* Center button */
+  .btn-center {
+    position: absolute;
+    right: 32px;
+    top: 196px;
+    width: 38px;
+    height: 38px;
+    background: radial-gradient(circle at 40% 35%, #9098a8, #5a6070);
+    border-radius: 50%;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9098a8;
+    font-size: 16px;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  .btn-center:active { transform: scale(0.95); }
+
+  /* Bottom buttons */
+  .btn-row {
+    position: absolute;
+    bottom: 72px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+  }
+  .btn-small {
+    width: 28px;
+    height: 10px;
+    background: linear-gradient(180deg, #6a7080, #50565e);
+    border-radius: 3px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+
+  /* Device label */
+  .device-label {
+    position: absolute;
+    bottom: 40px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 8px;
+    letter-spacing: 4px;
+    color: #8a909a;
+    text-transform: uppercase;
+  }
+  .device-sublabel {
+    position: absolute;
+    bottom: 28px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 5px;
+    letter-spacing: 2px;
+    color: #5a6070;
+    text-transform: uppercase;
+  }
+
+  /* Port slot */
+  .port {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 5px;
+    background: #2a2e34;
+    border-radius: 2px;
+  }
+
+  /* Branding above screen */
+  .branding {
+    position: absolute;
+    top: 12px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 5px;
+    letter-spacing: 3px;
+    color: #6a7080;
+    text-transform: uppercase;
+  }
+
+  @keyframes bootFade {
+    from { opacity: 0; transform: translateY(2px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Boot overlay */
+  .boot-overlay {
+    position: absolute;
+    inset: 0;
+    background: #0a0c08;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+    animation: bootDismiss 0.3s ease 0.6s forwards;
+    z-index: 10;
+  }
+  .boot-text {
+    font-size: 7px;
+    color: #c8a830;
+    letter-spacing: 2px;
+    animation: bootBlink 0.15s ease infinite;
+  }
+  .boot-bar {
+    width: 60%;
+    height: 2px;
+    background: #1a1e18;
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .boot-bar-fill {
+    height: 100%;
+    background: #c8a830;
+    animation: bootProgress 0.6s ease forwards;
+  }
+  @keyframes bootProgress {
+    from { width: 0; }
+    to   { width: 100%; }
+  }
+  @keyframes bootDismiss {
+    to { opacity: 0; pointer-events: none; }
+  }
+  @keyframes bootBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  /* Shadow screws */
+  .corner-detail {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #4a5060, #3a4050);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
+  }
+  .corner-detail.tl { top: 8px; left: 8px; }
+  .corner-detail.tr { top: 8px; right: 8px; }
+  .corner-detail.bl { bottom: 8px; left: 8px; }
+  .corner-detail.br { bottom: 8px; right: 8px; }
+
+  /* Ambient objects */
+  .ambient { position: absolute; opacity: 0.4; }
+</style>
+</head>
+<body>
+<div class="scene">
+  <!-- Ambient objects -->
+  <div class="ambient" style="bottom:60px; left:30px; width:80px; height:3px; background:#aaa; border-radius:2px; transform:rotate(-2deg);"></div>
+  <div class="ambient" style="bottom:80px; right:40px; width:60px; height:3px; background:#aaa; border-radius:2px; transform:rotate(10deg);"></div>
+  <div class="ambient" style="bottom:120px; right:20px; width:3px; height:40px; background:#aaa; border-radius:2px; transform:rotate(15deg);"></div>
+
+  <div class="device">
+    <div class="corner-detail tl"></div>
+    <div class="corner-detail tr"></div>
+    <div class="corner-detail bl"></div>
+    <div class="corner-detail br"></div>
+
+    <div class="branding">ACME AGENT SUPPLY</div>
+
+    <div class="screen">
+      <div class="screen-inner">
+        <!-- Boot overlay -->
+        <div class="boot-overlay">
+          <div class="boot-text">INITIALIZING</div>
+          <div class="boot-bar"><div class="boot-bar-fill"></div></div>
+        </div>
+
+        <div class="header-row">
+          <div class="label-triage">TRIAGE UNIT</div>
+          <div class="status-dot">
+            <div class="dot"></div>
+            ACTIVE
+          </div>
+        </div>
+
+        <div class="waveform-wrap">
+          <canvas class="waveform" id="waveCanvas" width="212" height="52"></canvas>
+        </div>
+
+        <div class="score-row">
+          <div class="score-num" id="scoreNum">87</div>
+          <div class="score-denom">/100</div>
+          <div class="score-badge">NOMINAL</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEDs -->
+    <div class="leds">
+      <div class="led-row" style="--delay:2.4s"><div class="led green"></div><div class="led-label">SYS</div></div>
+      <div class="led-row" style="--delay:2.6s"><div class="led amber"></div><div class="led-label">NET</div></div>
+      <div class="led-row" style="--delay:2.8s"><div class="led red"></div><div class="led-label">ERR</div></div>
+    </div>
+
+    <!-- Center button -->
+    <div class="btn-center">+</div>
+
+    <!-- Bottom buttons -->
+    <div class="btn-row">
+      <div class="btn-small"></div>
+      <div class="btn-small"></div>
+      <div class="btn-small"></div>
+    </div>
+
+    <div class="device-label">TRIAGE UNIT</div>
+    <div class="device-sublabel">ACME &nbsp; AG-274 &nbsp; TU-485</div>
+    <div class="port"></div>
+  </div>
+</div>
+
+<script>
+// ── Waveform animator ────────────────────────────────────────────────────────
+const canvas = document.getElementById('waveCanvas');
+const ctx    = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+let t = 0;
+
+// Realistic ECG-like waveform generator
+function ecgPoint(x, t) {
+  const period = 60;
+  const phase  = (x + t) % period;
+  let y = 0;
+  // Flat baseline
+  if (phase < 10) y = 0;
+  // P wave (small bump)
+  else if (phase < 18) y = 0.12 * Math.sin(Math.PI * (phase - 10) / 8);
+  // QRS complex (sharp spike)
+  else if (phase < 22) y = -0.08 * (phase - 18) / 4;
+  else if (phase < 24) y = -0.08 + 0.88 * (phase - 22) / 2;
+  else if (phase < 26) y = 0.80 - 0.90 * (phase - 24) / 2;
+  else if (phase < 30) y = -0.10 + 0.10 * (phase - 26) / 4;
+  // T wave
+  else if (phase < 46) y = 0.22 * Math.sin(Math.PI * (phase - 30) / 16);
+  else y = 0;
+  return y;
+}
+
+function drawWave() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Subtle glow trail
+  const grd = ctx.createLinearGradient(0, 0, W, 0);
+  grd.addColorStop(0,   'rgba(200,168,48,0)');
+  grd.addColorStop(0.6, 'rgba(200,168,48,0.15)');
+  grd.addColorStop(1,   'rgba(200,168,48,0.4)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+
+  // Waveform line
+  ctx.beginPath();
+  ctx.strokeStyle = '#c8a830';
+  ctx.lineWidth   = 1.5;
+  ctx.shadowColor = '#f0c040';
+  ctx.shadowBlur  = 5;
+
+  for (let x = 0; x < W; x++) {
+    const v = ecgPoint(x * 0.8, t);
+    const y = H / 2 - v * H * 0.42;
+    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Scan cursor
+  const curX = W - (t * 1.5 % W);
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(200,168,48,0.6)';
+  ctx.lineWidth   = 1;
+  ctx.shadowBlur  = 0;
+  ctx.moveTo(curX, 0);
+  ctx.lineTo(curX, H);
+  ctx.stroke();
+
+  t += 0.8;
+  requestAnimationFrame(drawWave);
+}
+
+// Start after boot animation
+setTimeout(drawWave, 1700);
+
+// Score count-up
+setTimeout(() => {
+  const el  = document.getElementById('scoreNum');
+  let cur   = 0;
+  const target = 87;
+  const step = () => {
+    cur = Math.min(cur + 3, target);
+    el.textContent = cur;
+    if (cur < target) requestAnimationFrame(step);
+  };
+  step();
+}, 2200);
+</script>
+</body>
+</html>
