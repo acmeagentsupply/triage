@@ -3,493 +3,1048 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OCTriageUnit — Triage Unit v4.4</title>
+<title>Triage Unit</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+
   body {
-    background: #e8e4dc;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 100vh;
-    font-family: 'Courier New', monospace;
+    font-family: 'IBM Plex Mono', monospace;
+    /* Bright, well-lit environment */
+    background: linear-gradient(180deg, #e8e0d4 0%, #ded6c4 40%, #d4ccbc 100%);
   }
 
   .scene {
-    position: relative;
     width: 500px;
     height: 500px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: relative;
+  }
+
+  /* ============================================
+     WORKBENCH — Clearly visible, textured metal
+     ============================================ */
+  .bench {
+    position: absolute;
+    bottom: 30px;
+    left: -60px;
+    right: -60px;
+    height: 300px;
+
+    /* Brushed steel with asymmetric wear */
+    background:
+      /* Random scratch — long diagonal */
+      linear-gradient(162deg, transparent 30%, rgba(255,255,255,0.04) 30.2%, rgba(255,255,255,0.04) 30.4%, transparent 30.6%),
+      /* Short scratch cluster — upper right area */
+      linear-gradient(175deg, transparent 55%, rgba(255,255,255,0.03) 55.1%, rgba(255,255,255,0.03) 55.3%, transparent 55.4%),
+      linear-gradient(168deg, transparent 58%, rgba(255,255,255,0.025) 58.1%, rgba(255,255,255,0.025) 58.2%, transparent 58.3%),
+      /* Wear spot — where device usually sits, slightly lighter/polished */
+      radial-gradient(ellipse 80px 50px at 46% 40%, rgba(255,255,255,0.03) 0%, transparent 100%),
+      /* Oil/grease smudge — irregular, off-center left */
+      radial-gradient(ellipse 35px 20px at 28% 55%, rgba(0,0,0,0.03) 0%, transparent 100%),
+      radial-gradient(ellipse 18px 25px at 32% 50%, rgba(0,0,0,0.02) 0%, transparent 100%),
+      /* Brushed grain — not perfectly horizontal */
+      repeating-linear-gradient(88deg, transparent 0px, transparent 3px, rgba(255,255,255,0.025) 3px, rgba(255,255,255,0.025) 3.5px),
+      repeating-linear-gradient(91deg, transparent 0px, transparent 9px, rgba(0,0,0,0.015) 9px, rgba(0,0,0,0.015) 10px),
+      /* Base — slight warm-to-cool shift left to right */
+      linear-gradient(90deg, #beb6a6 0%, #bab2a4 30%, #b4ac9c 60%, #b0a896 100%),
+      linear-gradient(175deg, #bcb4a4 0%, #b0a89a 30%, #a6a092 60%, #9e988c 100%);
+
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.15),
+      0 -1px 3px rgba(0,0,0,0.1);
+  }
+
+  /* Bench front edge — with nick */
+  .bench::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background:
+      /* Small nick/dent in edge */
+      radial-gradient(ellipse 4px 3px at 35% 50%, rgba(0,0,0,0.08) 0%, transparent 100%),
+      linear-gradient(180deg, #969088, #8a847c);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+
+  /* ============================================
+     THE DEVICE — Rugged field scanner
+     Chunky, thick, clearly a tool not a phone
+     ============================================ */
+  .device-wrap {
+    position: absolute;
+    top: 46%;
+    left: 49%;
+    transform: translate(-52%, -48%) rotate(-2.5deg);
+    z-index: 10;
+    /* Drop shadow on bench — hard and visible */
+    filter: drop-shadow(6px 10px 12px rgba(0,0,0,0.4)) drop-shadow(2px 3px 4px rgba(0,0,0,0.3));
   }
 
   .device {
+    width: 180px;
+    height: 290px;
+    border-radius: 10px;
     position: relative;
-    width: 260px;
-    height: 340px;
-    background: linear-gradient(145deg, #7a7f85, #5c6168, #6b7078);
-    border-radius: 18px;
+
+    /* Polymer body — with color variance: warmer upper-left, cooler lower-right */
+    background:
+      /* Color variance — slight warm/cool shift across body */
+      radial-gradient(ellipse 60% 50% at 30% 25%, rgba(100, 90, 70, 0.08) 0%, transparent 100%),
+      radial-gradient(ellipse 50% 40% at 75% 80%, rgba(60, 65, 70, 0.06) 0%, transparent 100%),
+      /* Base polymer */
+      linear-gradient(170deg, #64625e 0%, #5c5a56 20%, #565450 50%, #504e4a 80%, #4a4846 100%);
+
+    /* Softer edge definition — not CAD-crisp */
+    border: 1px solid rgba(0,0,0,0.12);
     box-shadow:
-      0 20px 60px rgba(0,0,0,0.45),
-      0 4px 8px rgba(0,0,0,0.3),
-      inset 0 1px 0 rgba(255,255,255,0.15);
-    transform: rotate(-4deg);
-    transition: transform 0.3s ease;
+      /* Top edge highlight — uneven, stronger on left (key light) */
+      inset 2px 1px 0 rgba(255,255,255,0.14),
+      inset -1px 0 0 rgba(255,255,255,0.05),
+      inset 0 -1px 0 rgba(0,0,0,0.08),
+      /* Slight edge bloom / softness */
+      0 0 1px rgba(255,255,255,0.06);
   }
 
-  .device:hover { transform: rotate(-2deg) scale(1.02); }
-
-  /* Screen */
-  .screen {
+  /* Fingerprints, scuffs, specular breakup — the life layer */
+  .device::before {
+    content: '';
     position: absolute;
-    top: 24px;
-    left: 18px;
-    right: 18px;
-    height: 160px;
-    background: #0a0c08;
-    border-radius: 6px;
-    border: 2px solid #2a2e2a;
+    inset: 0;
+    border-radius: 10px;
+    pointer-events: none;
+    z-index: 20;
+    background:
+      /* Fingerprint smudge near screen — slightly glossy patch */
+      radial-gradient(ellipse 28px 18px at 62% 22%, rgba(255,255,255,0.035) 0%, transparent 100%),
+      /* Thumb smudge on button area */
+      radial-gradient(ellipse 22px 20px at 48% 52%, rgba(255,255,255,0.025) 0%, transparent 100%),
+      /* Palm wear on lower grip — lighter from use */
+      radial-gradient(ellipse 50px 30px at 45% 82%, rgba(255,255,255,0.02) 0%, transparent 100%),
+      /* Micro scuff — diagonal near top-right corner */
+      linear-gradient(135deg, transparent 72%, rgba(255,255,255,0.04) 72.5%, rgba(255,255,255,0.04) 73%, transparent 73.5%),
+      /* Scuff — short horizontal near bottom-left */
+      linear-gradient(90deg, transparent 8%, rgba(255,255,255,0.035) 8.5%, rgba(255,255,255,0.035) 11%, transparent 11.5%),
+      /* Specular breakup — irregular highlight patches from matte texture */
+      radial-gradient(ellipse 15px 8px at 25% 15%, rgba(255,255,255,0.025) 0%, transparent 100%),
+      radial-gradient(ellipse 10px 12px at 70% 40%, rgba(255,255,255,0.02) 0%, transparent 100%),
+      radial-gradient(ellipse 18px 6px at 40% 65%, rgba(255,255,255,0.015) 0%, transparent 100%);
+  }
+
+  /* Polymer dust catch on top edge + uneven edge wear */
+  .device::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    pointer-events: none;
+    z-index: 21;
+    /* Dust on top edge — asymmetric, heavier on left */
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.015) 0%, transparent 2%),
+      /* Edge wear — lighter polymer showing through on corners */
+      radial-gradient(ellipse 12px 8px at 2% 1%, rgba(255,255,255,0.04) 0%, transparent 100%),
+      radial-gradient(ellipse 8px 10px at 98% 2%, rgba(255,255,255,0.03) 0%, transparent 100%),
+      radial-gradient(ellipse 10px 8px at 1% 99%, rgba(255,255,255,0.05) 0%, transparent 100%),
+      radial-gradient(ellipse 14px 6px at 99% 98%, rgba(255,255,255,0.035) 0%, transparent 100%),
+      /* Wear along left edge where it gets picked up */
+      linear-gradient(90deg, rgba(255,255,255,0.02) 0%, transparent 4%);
+  }
+
+  /* ============================================
+     RUBBER BUMPER EDGES — Thick, protective
+     ============================================ */
+  .bumper-top {
+    position: absolute;
+    top: -3px;
+    left: 20px;
+    right: 20px;
+    height: 8px;
+    background: linear-gradient(180deg, #3e3d3c, #464544);
+    border-radius: 6px 6px 0 0;
+    box-shadow: 0 -1px 2px rgba(0,0,0,0.15);
+  }
+
+  .bumper-bottom {
+    position: absolute;
+    bottom: -3px;
+    left: 20px;
+    right: 20px;
+    height: 8px;
+    background: linear-gradient(180deg, #464544, #3e3d3c);
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  }
+
+  .bumper-left {
+    position: absolute;
+    left: -4px;
+    top: 15px;
+    bottom: 15px;
+    width: 10px;
+    background: linear-gradient(90deg, #3e3d3c, #464544);
+    border-radius: 5px 0 0 5px;
+  }
+
+  /* Rubber grip ridges — visible */
+  .bumper-left::after {
+    content: '';
+    position: absolute;
+    top: 20%;
+    bottom: 20%;
+    left: 2px;
+    right: 2px;
+    background: repeating-linear-gradient(
+      180deg,
+      rgba(255,255,255,0.04) 0px,
+      rgba(255,255,255,0.04) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  }
+
+  .bumper-right {
+    position: absolute;
+    right: -4px;
+    top: 15px;
+    bottom: 15px;
+    width: 10px;
+    background: linear-gradient(90deg, #464544, #3e3d3c);
+    border-radius: 0 5px 5px 0;
+  }
+
+  .bumper-right::after {
+    content: '';
+    position: absolute;
+    top: 20%;
+    bottom: 20%;
+    left: 2px;
+    right: 2px;
+    background: repeating-linear-gradient(
+      180deg,
+      rgba(255,255,255,0.04) 0px,
+      rgba(255,255,255,0.04) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  }
+
+  /* Corner bumper reinforcements */
+  .corner-pad {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    z-index: 5;
+  }
+  /* Each corner slightly different — real wear is asymmetric */
+  .corner-pad.tl { top: -2px; left: -2px; border-radius: 11px 0 7px 0; background: #444342; 
+    box-shadow: inset -1px -1px 2px rgba(0,0,0,0.1), inset 1px 1px 0 rgba(255,255,255,0.04); }
+  .corner-pad.tr { top: -2px; right: -2px; border-radius: 0 9px 0 8px; background: #424140;
+    box-shadow: inset 1px -1px 2px rgba(0,0,0,0.08); }
+  .corner-pad.bl { bottom: -2px; left: -2px; border-radius: 0 9px 0 11px; background: #454443;
+    /* Bottom-left gets most wear from being set down */
+    box-shadow: inset -1px 1px 2px rgba(0,0,0,0.08), inset 0 0 3px rgba(255,255,255,0.02); }
+  .corner-pad.br { bottom: -2px; right: -2px; border-radius: 7px 0 10px 0; background: #403f3e;
+    box-shadow: inset 1px 1px 2px rgba(0,0,0,0.1); }
+
+  /* ============================================
+     SCREEN — Bright amber, recessed into bezel
+     ============================================ */
+  .screen-housing {
+    position: absolute;
+    top: 20px;
+    left: 14px;
+    right: 14px;
+    height: 110px;
+    background: #0a0a09;
+    border-radius: 5px;
+    border: 2px solid #1a1918;
+    box-shadow:
+      inset 0 2px 6px rgba(0,0,0,0.6),
+      0 1px 0 rgba(255,255,255,0.06);
     overflow: hidden;
-    box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+    z-index: 10;
+  }
+
+  /* Screen glow */
+  .screen-housing::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    background: radial-gradient(ellipse 90% 80% at 50% 50%, rgba(200, 148, 58, 0.11) 0%, transparent 75%);
+    pointer-events: none;
+    z-index: -1;
   }
 
   .screen-inner {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    padding: 10px 12px;
-  }
-
-  /* Scan line flicker */
-  .screen-inner::after {
-    content: '';
     position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: rgba(255,200,0,0.06);
-    animation: scanline 4s linear infinite;
-    pointer-events: none;
-  }
-  @keyframes scanline {
-    0%   { top: 0; }
-    100% { top: 100%; }
+    inset: 4px;
+    background: #0e0d0b;
+    border-radius: 2px;
+    overflow: hidden;
   }
 
-  .header-row {
+  /* Scanlines replaced by uneven scanline overlay element */
+  .screen-inner::after {
+    content: none;
+  }
+
+  .scr-content {
+    position: absolute;
+    inset: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    z-index: 2;
+    animation: bootUp 0.8s ease-out 0.2s forwards;
+    opacity: 0;
+  }
+
+  @keyframes bootUp {
+    0% { opacity: 0; }
+    30% { opacity: 0.6; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
+  }
+
+  .scr-top {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 6px;
   }
 
-  .label-triage {
-    font-size: 9px;
-    letter-spacing: 3px;
-    color: #c8a830;
-    font-weight: bold;
+  .scr-title {
+    font-size: 6.5px;
+    letter-spacing: 2.5px;
+    color: #c8943a;
     text-transform: uppercase;
-    opacity: 0;
-    animation: bootFade 0.4s ease 0.8s forwards;
+    font-weight: 600;
+    opacity: 0.85;
   }
 
-  .status-dot {
+  .scr-live {
     display: flex;
     align-items: center;
-    gap: 4px;
-    font-size: 7px;
-    color: #6adb6a;
-    letter-spacing: 1px;
-    opacity: 0;
-    animation: bootFade 0.4s ease 1.2s forwards;
+    gap: 3px;
   }
 
-  .dot {
-    width: 5px;
-    height: 5px;
-    background: #4ade4a;
+  .scr-live-dot {
+    width: 4px;
+    height: 4px;
     border-radius: 50%;
-    box-shadow: 0 0 6px #4ade4a;
-    animation: pulse 2s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; box-shadow: 0 0 6px #4ade4a; }
-    50%       { opacity: 0.6; box-shadow: 0 0 2px #4ade4a; }
+    background: #6abf6a;
+    box-shadow: 0 0 6px rgba(106, 191, 106, 0.6);
+    animation: blink 2s ease-in-out infinite;
   }
 
-  /* Waveform canvas */
-  .waveform-wrap {
-    height: 52px;
+  @keyframes blink {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  .scr-live-text {
+    font-size: 5px;
+    letter-spacing: 1.5px;
+    color: rgba(106, 191, 106, 0.7);
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  /* Waveform */
+  .wave-box {
+    flex: 1;
+    overflow: hidden;
     position: relative;
-    opacity: 0;
-    animation: bootFade 0.4s ease 1.6s forwards;
-  }
-  canvas.waveform {
-    width: 100%;
-    height: 100%;
-    display: block;
   }
 
-  /* Score */
-  .score-row {
+  .wave-svg {
+    width: 100%;
+    height: 36px;
+  }
+
+  .wf-grid { stroke: rgba(200, 148, 58, 0.1); stroke-width: 0.4; }
+  .wf-main {
+    fill: none;
+    stroke: #c8943a;
+    stroke-width: 1.4;
+    filter: drop-shadow(0 0 2px rgba(200,148,58,0.3));
+  }
+  .wf-ghost {
+    fill: none;
+    stroke: #c8943a;
+    stroke-width: 0.7;
+    opacity: 0.2;
+  }
+
+  .wf-scroll { animation: scrollWave 8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite; }
+  @keyframes scrollWave {
+    0% { transform: translateX(0); }
+    40% { transform: translateX(-18%); }
+    60% { transform: translateX(-32%); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* Readout */
+  .scr-readout {
     display: flex;
     align-items: baseline;
     gap: 6px;
-    margin-top: 8px;
-    opacity: 0;
-    animation: bootFade 0.4s ease 2.0s forwards;
+    margin-top: 5px;
+    padding-top: 5px;
+    border-top: 1px solid rgba(200, 148, 58, 0.12);
   }
-  .score-num {
-    font-size: 36px;
-    font-weight: bold;
-    color: #f0c040;
+
+  .scr-num {
+    font-size: 22px;
+    font-weight: 700;
+    color: #c8943a;
     line-height: 1;
-    font-family: 'Courier New', monospace;
-    text-shadow: 0 0 12px rgba(240,192,64,0.6);
-    animation: scoreCount 1.5s ease 2.2s both;
+    letter-spacing: -0.5px;
+    text-shadow: 0 0 4px rgba(200, 148, 58, 0.2);
   }
-  @keyframes scoreCount {
-    from { opacity: 0.3; }
-    to   { opacity: 1; }
+
+  .scr-of {
+    font-size: 9px;
+    color: rgba(200, 148, 58, 0.35);
+    font-weight: 400;
   }
-  .score-denom { font-size: 11px; color: #8a7a40; }
-  .score-badge {
-    margin-left: 6px;
-    font-size: 7px;
+
+  .scr-tag {
+    margin-left: auto;
+    font-size: 5.5px;
     letter-spacing: 2px;
-    border: 1px solid #c8a830;
-    color: #c8a830;
+    color: rgba(200, 148, 58, 0.6);
+    text-transform: uppercase;
+    font-weight: 600;
     padding: 2px 6px;
+    border: 1px solid rgba(200, 148, 58, 0.2);
     border-radius: 2px;
   }
 
-  /* Status LEDs */
-  .leds {
-    position: absolute;
-    left: 20px;
-    top: 196px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .led-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    opacity: 0;
-    animation: bootFade 0.3s ease var(--delay) forwards;
-  }
-  .led {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-  }
-  .led.green  { background: #4ade4a; box-shadow: 0 0 5px #4ade4a; }
-  .led.amber  { background: #f0a020; box-shadow: 0 0 5px #f0a020; animation: amberBlink 3s ease-in-out infinite; }
-  .led.red    { background: #e04040; box-shadow: 0 0 5px #e04040; }
-  @keyframes amberBlink {
-    0%, 90%, 100% { opacity: 1; }
-    95% { opacity: 0.3; }
-  }
-  .led-label { font-size: 6px; color: #7a8090; letter-spacing: 1px; }
+  /* ============================================
+     CONTROLS — Big, tactile, field-usable
+     ============================================ */
 
-  /* Center button */
-  .btn-center {
+  /* Main action button — large, raised, unmistakable */
+  .btn-action {
     position: absolute;
-    right: 32px;
-    top: 196px;
-    width: 38px;
-    height: 38px;
-    background: radial-gradient(circle at 40% 35%, #9098a8, #5a6070);
-    border-radius: 50%;
-    box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #9098a8;
-    font-size: 16px;
-    cursor: pointer;
-    transition: transform 0.1s;
-  }
-  .btn-center:active { transform: scale(0.95); }
-
-  /* Bottom buttons */
-  .btn-row {
-    position: absolute;
-    bottom: 72px;
+    top: 146px;
     left: 50%;
     transform: translateX(-50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid #1a1918;
+    cursor: pointer;
+    z-index: 10;
+    background: linear-gradient(150deg, #666462, #5a5856, #504e4c);
+    box-shadow:
+      0 3px 8px rgba(0,0,0,0.4),
+      0 1px 2px rgba(0,0,0,0.3),
+      inset 0 1px 0 rgba(255,255,255,0.1),
+      inset 0 -2px 4px rgba(0,0,0,0.15);
+    transition: all 0.1s ease;
+  }
+
+  .btn-action:active {
+    transform: translateX(-50%) translateY(1px);
+    box-shadow:
+      0 1px 3px rgba(0,0,0,0.4),
+      inset 0 2px 6px rgba(0,0,0,0.2);
+  }
+
+  /* Inner ring */
+  .btn-action::before {
+    content: '';
+    position: absolute;
+    top: 4px; left: 4px; right: 4px; bottom: 4px;
+    border-radius: 50%;
+    border: 1px solid rgba(200, 148, 58, 0.2);
+  }
+
+  /* Center crosshair */
+  .btn-action::after {
+    content: '+';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 16px;
+    font-weight: 300;
+    color: rgba(200, 148, 58, 0.5);
+    line-height: 1;
+  }
+
+  /* D-pad / rocker — 4 direction buttons */
+  .dpad {
+    position: absolute;
+    top: 200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 40px;
     display: flex;
-    gap: 8px;
+    gap: 4px;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
   }
-  .btn-small {
-    width: 28px;
+
+  .dpad-btn {
+    width: 16px;
     height: 10px;
-    background: linear-gradient(180deg, #6a7080, #50565e);
-    border-radius: 3px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+    border-radius: 2px;
+    background: linear-gradient(180deg, #5a5856, #504e4c);
+    border: 1px solid rgba(0,0,0,0.3);
+    box-shadow:
+      0 1px 3px rgba(0,0,0,0.25),
+      inset 0 1px 0 rgba(255,255,255,0.06);
   }
 
-  /* Device label */
-  .device-label {
+  /* LED cluster — bigger, clearly visible */
+  .leds {
     position: absolute;
-    bottom: 40px;
-    left: 0; right: 0;
-    text-align: center;
-    font-size: 8px;
-    letter-spacing: 4px;
-    color: #8a909a;
-    text-transform: uppercase;
-  }
-  .device-sublabel {
-    position: absolute;
-    bottom: 28px;
-    left: 0; right: 0;
-    text-align: center;
-    font-size: 5px;
-    letter-spacing: 2px;
-    color: #5a6070;
-    text-transform: uppercase;
+    top: 138px;
+    left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 10;
   }
 
-  /* Port slot */
-  .port {
+  .led-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .led-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.3);
+  }
+
+  .led-g {
+    background: radial-gradient(circle at 35% 35%, #8cd888, #4ea84a);
+    box-shadow: 0 0 6px rgba(78, 168, 74, 0.5);
+  }
+
+  .led-a {
+    background: radial-gradient(circle at 35% 35%, #e0bc6a, #c89a3a);
+    box-shadow: 0 0 6px rgba(200, 154, 58, 0.4);
+  }
+
+  .led-r {
+    background: radial-gradient(circle at 35% 35%, #444240, #343230);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+  }
+
+  .led-label {
+    font-size: 4.5px;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.22);
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  /* ============================================
+     BODY DETAILS
+     ============================================ */
+
+  /* Mold parting line */
+  .part-line {
+    position: absolute;
+    top: 242px;
+    left: 14px;
+    right: 14px;
+    height: 1px;
+    background: rgba(0,0,0,0.2);
+    z-index: 10;
+  }
+  .part-line::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0; right: 0;
+    height: 1px;
+    background: rgba(255,255,255,0.04);
+  }
+
+  /* TRIAGE UNIT stamped label — bold, visible */
+  .stamp {
+    position: absolute;
+    top: 250px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.25);
+    font-weight: 700;
+    white-space: nowrap;
+    z-index: 10;
+    text-shadow: 0 -1px 0 rgba(0,0,0,0.3);
+  }
+
+  /* ACME serial */
+  .serial {
     position: absolute;
     bottom: 14px;
     left: 50%;
     transform: translateX(-50%);
-    width: 24px;
+    font-size: 5px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.12);
+    font-weight: 500;
+    white-space: nowrap;
+    z-index: 10;
+  }
+
+  /* Model number side */
+  .model-side {
+    position: absolute;
+    top: 148px;
+    right: 16px;
+    font-size: 4px;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.06);
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+    z-index: 10;
+  }
+
+  /* Screws — bigger, more visible */
+  .screw {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    z-index: 15;
+    background: radial-gradient(circle at 36% 30%, #706e6a, #5a5856);
+    border: 1px solid rgba(0,0,0,0.3);
+    box-shadow:
+      inset 0 1px 2px rgba(0,0,0,0.3),
+      0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .screw::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 20%; right: 20%;
+    height: 1px;
+    background: rgba(0,0,0,0.4);
+    transform: translateY(-50%) rotate(25deg);
+  }
+
+  .screw::after {
+    content: '';
+    position: absolute;
+    top: 20%; bottom: 20%; left: 50%;
+    width: 1px;
+    background: rgba(0,0,0,0.25);
+    transform: translateX(-50%) rotate(25deg);
+  }
+
+  .s1 { top: 8px; left: 10px; }
+  .s2 { top: 8px; right: 10px; }
+  .s3 { bottom: 8px; left: 10px; }
+  .s4 { bottom: 8px; right: 10px; }
+
+  /* Vent slots — side */
+  .vents {
+    position: absolute;
+    right: 2px;
+    top: 170px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 10;
+  }
+
+  .vent {
+    width: 12px;
+    height: 2px;
+    background: #181716;
+    border-radius: 1px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.03);
+  }
+
+  /* IO ports bottom */
+  .io-ports {
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    z-index: 10;
+  }
+
+  .port-usb {
+    width: 16px;
+    height: 6px;
+    border-radius: 2px;
+    background: #161514;
+    border: 1px solid rgba(0,0,0,0.3);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);
+  }
+
+  .port-aux {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #141312;
+    border: 1px solid rgba(0,0,0,0.3);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);
+  }
+
+  /* Grip texture — lower body */
+  .grip-zone {
+    position: absolute;
+    top: 265px;
+    left: 14px;
+    right: 14px;
+    bottom: 22px;
+    border-radius: 3px;
+    z-index: 8;
+    background:
+      repeating-linear-gradient(45deg, transparent 0px, transparent 3px, rgba(255,255,255,0.015) 3px, rgba(255,255,255,0.015) 3.5px),
+      repeating-linear-gradient(-45deg, transparent 0px, transparent 3px, rgba(255,255,255,0.015) 3px, rgba(255,255,255,0.015) 3.5px);
+  }
+
+  /* ============================================
+     BENCH OBJECTS — grounding context
+     ============================================ */
+  .hex-key {
+    position: absolute;
+    bottom: 95px;
+    right: 65px;
+    width: 55px;
     height: 5px;
-    background: #2a2e34;
+    background: linear-gradient(180deg, #9a9690, #8e8a84, #9a9690);
+    border-radius: 2px;
+    transform: rotate(18deg);
+    box-shadow: 2px 3px 6px rgba(0,0,0,0.3);
+    z-index: 8;
+  }
+
+  .hex-key::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1.5px;
+    background: linear-gradient(90deg, transparent 5%, rgba(255,255,255,0.08) 50%, transparent 95%);
     border-radius: 2px;
   }
 
-  /* Branding above screen */
-  .branding {
+  .hex-key::after {
+    content: '';
     position: absolute;
-    top: 12px;
-    left: 0; right: 0;
-    text-align: center;
-    font-size: 5px;
-    letter-spacing: 3px;
-    color: #6a7080;
-    text-transform: uppercase;
+    right: -6px;
+    top: -3px;
+    width: 10px;
+    height: 10px;
+    background: linear-gradient(135deg, #949088, #8a8680);
+    border-radius: 1px;
+    transform: rotate(45deg);
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.2);
   }
 
-  @keyframes bootFade {
-    from { opacity: 0; transform: translateY(2px); }
-    to   { opacity: 1; transform: translateY(0); }
+  /* Small bolt on bench */
+  .bolt {
+    position: absolute;
+    bottom: 110px;
+    left: 90px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #a8a49a, #8a867e);
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    z-index: 8;
   }
 
-  /* Boot overlay */
-  .boot-overlay {
+  /* Coiled cable section */
+  .cable-coil {
+    position: absolute;
+    bottom: 68px;
+    left: 45px;
+    width: 80px;
+    height: 6px;
+    background: linear-gradient(180deg, #6a6866, #5e5c5a, #6a6866);
+    border-radius: 3px;
+    transform: rotate(-4deg);
+    box-shadow: 2px 3px 5px rgba(0,0,0,0.25);
+    z-index: 8;
+  }
+
+  .cable-coil::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 5%; right: 20%;
+    height: 1px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 1px;
+  }
+
+  /* Amber glow spill on bench from screen — warmer, wider */
+  .screen-spill {
+    position: absolute;
+    bottom: 82px;
+    left: 45%;
+    transform: translateX(-50%);
+    width: 140px;
+    height: 50px;
+    background: radial-gradient(ellipse, rgba(200, 148, 58, 0.09) 0%, rgba(200, 140, 50, 0.03) 50%, transparent 80%);
+    z-index: 5;
+  }
+
+  /* ============================================
+     LIGHTING — Key from upper-left, soft falloff right
+     ============================================ */
+  .key-light {
     position: absolute;
     inset: 0;
-    background: #0a0c08;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 4px;
-    animation: bootDismiss 0.3s ease 0.6s forwards;
-    z-index: 10;
-  }
-  .boot-text {
-    font-size: 7px;
-    color: #c8a830;
-    letter-spacing: 2px;
-    animation: bootBlink 0.15s ease infinite;
-  }
-  .boot-bar {
-    width: 60%;
-    height: 2px;
-    background: #1a1e18;
-    border-radius: 1px;
-    overflow: hidden;
-  }
-  .boot-bar-fill {
-    height: 100%;
-    background: #c8a830;
-    animation: bootProgress 0.6s ease forwards;
-  }
-  @keyframes bootProgress {
-    from { width: 0; }
-    to   { width: 100%; }
-  }
-  @keyframes bootDismiss {
-    to { opacity: 0; pointer-events: none; }
-  }
-  @keyframes bootBlink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+    pointer-events: none;
+    z-index: 40;
+    background:
+      /* Key light — upper left, warm */
+      radial-gradient(ellipse 50% 45% at 25% 15%, rgba(255, 245, 220, 0.1) 0%, transparent 100%),
+      /* Soft shadow falloff on right side */
+      linear-gradient(90deg, transparent 60%, rgba(0, 0, 0, 0.06) 100%);
   }
 
-  /* Shadow screws */
-  .corner-detail {
+  /* Very subtle vignette — barely there, with lens softness at edges */
+  .vignette {
     position: absolute;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: radial-gradient(circle, #4a5060, #3a4050);
-    box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
+    inset: 0;
+    pointer-events: none;
+    z-index: 42;
+    background: radial-gradient(ellipse 75% 70% at 45% 45%, transparent 50%, rgba(0, 0, 0, 0.08) 100%);
   }
-  .corner-detail.tl { top: 8px; left: 8px; }
-  .corner-detail.tr { top: 8px; right: 8px; }
-  .corner-detail.bl { bottom: 8px; left: 8px; }
-  .corner-detail.br { bottom: 8px; right: 8px; }
 
-  /* Ambient objects */
-  .ambient { position: absolute; opacity: 0.4; }
+  /* Lens softness — blur falloff at edges, sharp in center */
+  .lens-soft {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 43;
+    /* Ring of very mild blur around edges — mimics lens falloff */
+    backdrop-filter: blur(0.3px);
+    -webkit-backdrop-filter: blur(0.3px);
+    /* Mask: sharp center, soft edges */
+    mask-image: radial-gradient(ellipse 65% 60% at 48% 44%, transparent 55%, black 100%);
+    -webkit-mask-image: radial-gradient(ellipse 65% 60% at 48% 44%, transparent 55%, black 100%);
+  }
+
+  /* Micro DOF — far bench (top of bench surface) gets slight softness */
+  .bench-dof {
+    position: absolute;
+    bottom: 220px;
+    left: -60px;
+    right: -60px;
+    height: 80px;
+    pointer-events: none;
+    z-index: 9;
+    backdrop-filter: blur(0.4px);
+    -webkit-backdrop-filter: blur(0.4px);
+    /* Fade in from sharp to soft */
+    mask-image: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%);
+  }
+
+  /* Mild film grain — operator instrument grade */
+  .grain {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 44;
+    opacity: 0.12;
+    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.12'/%3E%3C/svg%3E");
+    mix-blend-mode: multiply;
+  }
+
+  /* ============================================
+     SCREEN IMPERFECTIONS — break the perfection
+     ============================================ */
+
+  /* Flicker — tiny brightness variance */
+  @keyframes screenFlicker {
+    0%, 100% { opacity: 1; }
+    4% { opacity: 0.97; }
+    8% { opacity: 1; }
+    47% { opacity: 0.985; }
+    50% { opacity: 1; }
+    83% { opacity: 0.975; }
+    86% { opacity: 1; }
+  }
+
+  .screen-inner {
+    animation: screenFlicker 4s ease-in-out infinite;
+  }
+
+  /* Uneven scanlines — heavier at top, lighter at bottom */
+  .scanline-uneven {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 6;
+    background:
+      repeating-linear-gradient(180deg, 
+        rgba(0,0,0,0.05) 0px, 
+        rgba(0,0,0,0.05) 1px, 
+        transparent 1px, 
+        transparent 3px
+      );
+    mask-image: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 100%);
+    -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 100%);
+  }
+
 </style>
 </head>
 <body>
+
 <div class="scene">
-  <!-- Ambient objects -->
-  <div class="ambient" style="bottom:60px; left:30px; width:80px; height:3px; background:#aaa; border-radius:2px; transform:rotate(-2deg);"></div>
-  <div class="ambient" style="bottom:80px; right:40px; width:60px; height:3px; background:#aaa; border-radius:2px; transform:rotate(10deg);"></div>
-  <div class="ambient" style="bottom:120px; right:20px; width:3px; height:40px; background:#aaa; border-radius:2px; transform:rotate(15deg);"></div>
 
-  <div class="device">
-    <div class="corner-detail tl"></div>
-    <div class="corner-detail tr"></div>
-    <div class="corner-detail bl"></div>
-    <div class="corner-detail br"></div>
+  <!-- Workbench -->
+  <div class="bench"></div>
+  <div class="bench-dof"></div>
 
-    <div class="branding">ACME AGENT SUPPLY</div>
+  <!-- Bench objects -->
+  <div class="hex-key"></div>
+  <div class="bolt"></div>
+  <div class="cable-coil"></div>
+  <div class="screen-spill"></div>
 
-    <div class="screen">
-      <div class="screen-inner">
-        <!-- Boot overlay -->
-        <div class="boot-overlay">
-          <div class="boot-text">INITIALIZING</div>
-          <div class="boot-bar"><div class="boot-bar-fill"></div></div>
-        </div>
+  <!-- ====== THE DEVICE ====== -->
+  <div class="device-wrap">
+    <div class="device">
 
-        <div class="header-row">
-          <div class="label-triage">TRIAGE UNIT</div>
-          <div class="status-dot">
-            <div class="dot"></div>
-            ACTIVE
+      <!-- Rubber bumpers -->
+      <div class="bumper-top"></div>
+      <div class="bumper-bottom"></div>
+      <div class="bumper-left"></div>
+      <div class="bumper-right"></div>
+      <div class="corner-pad tl"></div>
+      <div class="corner-pad tr"></div>
+      <div class="corner-pad bl"></div>
+      <div class="corner-pad br"></div>
+
+      <!-- Screws -->
+      <div class="screw s1"></div>
+      <div class="screw s2"></div>
+
+      <!-- ACME stamp on device top -->
+      <div style="position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:15; white-space:nowrap; font-size:5.5px; letter-spacing:3.5px; text-transform:uppercase; color:rgba(255,255,255,0.32); font-weight:700; text-shadow: 0 -0.5px 0 rgba(0,0,0,0.4), 0 0.5px 0 rgba(255,255,255,0.03);">ACME Agent Supply</div>
+      <div class="screw s3"></div>
+      <div class="screw s4"></div>
+
+      <!-- Screen -->
+      <div class="screen-housing">
+        <div class="screen-inner">
+          <div class="scanline-uneven"></div>
+          <div class="scr-content">
+
+            <div class="scr-top">
+              <span class="scr-title">Triage Unit</span>
+              <div class="scr-live">
+                <div class="scr-live-dot"></div>
+                <span class="scr-live-text">Active</span>
+              </div>
+            </div>
+
+            <div class="wave-box">
+              <svg class="wave-svg" viewBox="0 0 260 36" preserveAspectRatio="none">
+                <line class="wf-grid" x1="0" y1="9" x2="260" y2="9"/>
+                <line class="wf-grid" x1="0" y1="18" x2="260" y2="18"/>
+                <line class="wf-grid" x1="0" y1="27" x2="260" y2="27"/>
+
+                <g class="wf-scroll">
+                  <polyline class="wf-ghost" points="
+                    0,18 8,18 14,16 18,20 22,17 26,14 30,22 34,10 36,26 38,8 40,28 42,14 46,18
+                    52,18 56,16 60,20 64,17 68,14 72,22 76,10 78,26 80,8 82,28 84,14 88,18
+                    94,18 98,16 102,20 106,17 110,14 114,22 118,10 120,26 122,8 124,28 126,14 130,18
+                    136,18 140,16 144,20 148,17 152,14 156,22 160,10 162,26 164,8 166,28 168,14 172,18
+                    178,18 182,16 186,20 190,17 194,14 198,22 202,10 204,26 206,8 208,28 210,14 214,18
+                    220,18 224,16 228,20 232,17 236,14 240,22 244,10 246,26 248,8 250,28 252,14 256,18 260,18
+                  "/>
+                </g>
+
+                <g class="wf-scroll">
+                  <polyline class="wf-main" points="
+                    0,18 6,18 10,17 14,19 18,18 22,15 26,21 30,12 33,24 35,7 37,29 39,13 43,18
+                    48,18 52,17 56,19 60,18 64,15 68,21 72,12 75,24 77,7 79,29 81,13 85,18
+                    90,18 94,17 98,19 102,18 106,15 110,21 114,12 117,24 119,7 121,29 123,13 127,18
+                    132,18 136,17 140,19 144,18 148,15 152,21 156,12 159,24 161,7 163,29 165,13 169,18
+                    174,18 178,17 182,19 186,18 190,15 194,21 198,12 201,24 203,7 205,29 207,13 211,18
+                    216,18 220,17 224,19 228,18 232,15 236,21 240,12 243,24 245,7 247,29 249,13 253,18 260,18
+                  "/>
+                </g>
+              </svg>
+            </div>
+
+            <div class="scr-readout">
+              <span class="scr-num">87</span>
+              <span class="scr-of">/100</span>
+              <span class="scr-tag">Nominal</span>
+            </div>
+
           </div>
         </div>
-
-        <div class="waveform-wrap">
-          <canvas class="waveform" id="waveCanvas" width="212" height="52"></canvas>
-        </div>
-
-        <div class="score-row">
-          <div class="score-num" id="scoreNum">87</div>
-          <div class="score-denom">/100</div>
-          <div class="score-badge">NOMINAL</div>
-        </div>
       </div>
+
+      <!-- LEDs -->
+      <div class="leds">
+        <div class="led-item"><div class="led-dot led-g"></div><span class="led-label">SYS</span></div>
+        <div class="led-item"><div class="led-dot led-a"></div><span class="led-label">NET</span></div>
+        <div class="led-item"><div class="led-dot led-r"></div><span class="led-label">ERR</span></div>
+      </div>
+
+      <!-- Main button -->
+      <button class="btn-action"></button>
+
+      <!-- D-pad -->
+      <div class="dpad">
+        <div class="dpad-btn"></div>
+        <div class="dpad-btn"></div>
+        <div class="dpad-btn"></div>
+      </div>
+
+      <!-- Details -->
+      <div class="part-line"></div>
+      <div class="stamp">Triage Unit</div>
+      <div class="grip-zone"></div>
+      <div class="vents">
+        <div class="vent"></div>
+        <div class="vent"></div>
+        <div class="vent"></div>
+        <div class="vent"></div>
+        <div class="vent"></div>
+      </div>
+      <div class="io-ports">
+        <div class="port-usb"></div>
+        <div class="port-aux"></div>
+      </div>
+      <div class="serial">ACME · SN-77A · TU-400</div>
+      <div class="model-side">TU-400</div>
+
     </div>
-
-    <!-- LEDs -->
-    <div class="leds">
-      <div class="led-row" style="--delay:2.4s"><div class="led green"></div><div class="led-label">SYS</div></div>
-      <div class="led-row" style="--delay:2.6s"><div class="led amber"></div><div class="led-label">NET</div></div>
-      <div class="led-row" style="--delay:2.8s"><div class="led red"></div><div class="led-label">ERR</div></div>
-    </div>
-
-    <!-- Center button -->
-    <div class="btn-center">+</div>
-
-    <!-- Bottom buttons -->
-    <div class="btn-row">
-      <div class="btn-small"></div>
-      <div class="btn-small"></div>
-      <div class="btn-small"></div>
-    </div>
-
-    <div class="device-label">TRIAGE UNIT</div>
-    <div class="device-sublabel">ACME &nbsp; AG-274 &nbsp; TU-485</div>
-    <div class="port"></div>
   </div>
+
+  <!-- Lighting & film layers -->
+  <div class="key-light"></div>
+  <div class="vignette"></div>
+  <div class="lens-soft"></div>
+  <div class="grain"></div>
+
 </div>
-
-<script>
-// ── Waveform animator ────────────────────────────────────────────────────────
-const canvas = document.getElementById('waveCanvas');
-const ctx    = canvas.getContext('2d');
-const W = canvas.width, H = canvas.height;
-let t = 0;
-
-// Realistic ECG-like waveform generator
-function ecgPoint(x, t) {
-  const period = 60;
-  const phase  = (x + t) % period;
-  let y = 0;
-  // Flat baseline
-  if (phase < 10) y = 0;
-  // P wave (small bump)
-  else if (phase < 18) y = 0.12 * Math.sin(Math.PI * (phase - 10) / 8);
-  // QRS complex (sharp spike)
-  else if (phase < 22) y = -0.08 * (phase - 18) / 4;
-  else if (phase < 24) y = -0.08 + 0.88 * (phase - 22) / 2;
-  else if (phase < 26) y = 0.80 - 0.90 * (phase - 24) / 2;
-  else if (phase < 30) y = -0.10 + 0.10 * (phase - 26) / 4;
-  // T wave
-  else if (phase < 46) y = 0.22 * Math.sin(Math.PI * (phase - 30) / 16);
-  else y = 0;
-  return y;
-}
-
-function drawWave() {
-  ctx.clearRect(0, 0, W, H);
-
-  // Subtle glow trail
-  const grd = ctx.createLinearGradient(0, 0, W, 0);
-  grd.addColorStop(0,   'rgba(200,168,48,0)');
-  grd.addColorStop(0.6, 'rgba(200,168,48,0.15)');
-  grd.addColorStop(1,   'rgba(200,168,48,0.4)');
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, W, H);
-
-  // Waveform line
-  ctx.beginPath();
-  ctx.strokeStyle = '#c8a830';
-  ctx.lineWidth   = 1.5;
-  ctx.shadowColor = '#f0c040';
-  ctx.shadowBlur  = 5;
-
-  for (let x = 0; x < W; x++) {
-    const v = ecgPoint(x * 0.8, t);
-    const y = H / 2 - v * H * 0.42;
-    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-
-  // Scan cursor
-  const curX = W - (t * 1.5 % W);
-  ctx.beginPath();
-  ctx.strokeStyle = 'rgba(200,168,48,0.6)';
-  ctx.lineWidth   = 1;
-  ctx.shadowBlur  = 0;
-  ctx.moveTo(curX, 0);
-  ctx.lineTo(curX, H);
-  ctx.stroke();
-
-  t += 0.8;
-  requestAnimationFrame(drawWave);
-}
-
-// Start after boot animation
-setTimeout(drawWave, 1700);
-
-// Score count-up
-setTimeout(() => {
-  const el  = document.getElementById('scoreNum');
-  let cur   = 0;
-  const target = 87;
-  const step = () => {
-    cur = Math.min(cur + 3, target);
-    el.textContent = cur;
-    if (cur < target) requestAnimationFrame(step);
-  };
-  step();
-}, 2200);
-</script>
-</body>
 </html>
