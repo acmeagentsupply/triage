@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+
+# OCTriageUnit control-plane triage entrypoint
+# READ-ONLY MODE: this script must not modify system configuration or service state.
+# NO NETWORK CALLS: this script must not initiate outbound network activity or telemetry.
+# NO CONFIG MUTATION: this script must not write outside ~/octriage-bundles/ proof artifacts.
+
+set -u
+
+readonly BUNDLE_ROOT="${HOME}/octriage-bundles"
+
+print_help() {
+  # SAFE: Prints local help text only; does not inspect services, mutate config, or access the network.
+  cat <<'EOF'
+OCTriageUnit safety guarantees
+  - Read-only: never modifies system state
+  - No telemetry: zero outbound calls
+  - Local-only: all execution on the operator machine
+  - Proof bundle output: ~/octriage-bundles/ only
+  - Auditable source: cat bin/control-plane-triage
+
+Usage:
+  bin/control-plane-triage
+  bin/control-plane-triage --help
+
+Behavior:
+  - verifies required local tools are present
+  - creates a timestamped proof bundle directory
+  - leaves triage collection logic explicitly stubbed for review
+EOF
+}
+
+check_env() {
+  # SAFE: Checks only for local command availability; does not execute launchctl, openclaw, or any network operation.
+  local missing=0
+  local tool
+
+  for tool in launchctl openclaw; do
+    if ! command -v "${tool}" >/dev/null 2>&1; then
+      printf 'Missing required tool: %s\n' "${tool}" >&2
+      missing=1
+    fi
+  done
+
+  return "${missing}"
+}
+
+proof_bundle() {
+  # SAFE: Creates directories only under ~/octriage-bundles/ and writes placeholder proof files locally.
+  local timestamp bundle_dir
+
+  timestamp="$(date +%Y%m%d-%H%M%S)"
+  bundle_dir="${BUNDLE_ROOT}/${timestamp}"
+
+  mkdir -p "${bundle_dir}" || {
+    printf 'Failed to create proof bundle directory: %s\n' "${bundle_dir}" >&2
+    return 1
+  }
+
+  cat >"${bundle_dir}/bundle_summary.txt" <<EOF
+OCTriageUnit proof bundle
+created_at=${timestamp}
+mode=read-only
+notes=triage collection not yet implemented; this bundle was created by the safe public stub
+EOF
+
+  cat >"${bundle_dir}/gateway_err_tail.txt" <<'EOF'
+Triage collection TODO: capture the last 200 relevant gateway error lines here.
+EOF
+
+  cat >"${bundle_dir}/launchctl_snapshot.txt" <<'EOF'
+Triage collection TODO: capture local launchctl list output here.
+EOF
+
+  cat >"${bundle_dir}/doctor_output.txt" <<'EOF'
+Triage collection TODO: capture local openclaw doctor output here.
+EOF
+
+  if command -v shasum >/dev/null 2>&1; then
+    (
+      cd "${bundle_dir}" || exit 1
+      shasum -a 256 bundle_summary.txt gateway_err_tail.txt launchctl_snapshot.txt doctor_output.txt > manifest.sha256
+    ) || return 1
+  else
+    cat >"${bundle_dir}/manifest.sha256" <<'EOF'
+SHA256 manifest unavailable: shasum is not present on this machine.
+EOF
+  fi
+
+  printf 'Proof bundle initialized at %s\n' "${bundle_dir}"
+}
+
+main() {
+  # SAFE: Orchestrates local argument parsing and proof-bundle setup only; contains no service control or network behavior.
+  case "${1-}" in
+    --help|-h)
+      print_help
+      return 0
+      ;;
+    "")
+      ;;
+    *)
+      printf 'Unknown argument: %s\n\n' "${1}" >&2
+      print_help >&2
+      return 2
+      ;;
+  esac
+
+  if ! check_env; then
+    printf 'Environment check failed. Review missing tools above.\n' >&2
+    return 1
+  fi
+
+  if ! proof_bundle; then
+    printf 'Failed to initialize proof bundle.\n' >&2
+    return 1
+  fi
+
+  # TODO: Collect launchctl snapshot into launchctl_snapshot.txt without mutating service state.
+  # TODO: Collect openclaw doctor output into doctor_output.txt without writing outside the bundle.
+  # TODO: Collect filtered gateway error tail into gateway_err_tail.txt using local log sources only.
+  # TODO: Update bundle_summary.txt with concrete findings backed by saved artifacts.
+
+  return 0
+}
+
+main "$@"
