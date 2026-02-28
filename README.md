@@ -1,5 +1,7 @@
 # OCTriageUnit
 
+![Control Plane Trusted](docs/assets/control-plane-trusted.svg)
+
 OCTriageUnit is a public, read-only OpenClaw control plane triage tool for operators who need fast local diagnostics without changing system state. It is designed for degraded environments where safety matters more than convenience: the script gathers evidence, records what it found into a proof bundle under the operator's home directory, and keeps all work on the local machine so findings can be reviewed, reproduced, and shared without hidden behavior.
 
 ## SAFETY GUARANTEES
