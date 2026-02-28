@@ -16,6 +16,43 @@ OCTriageUnit is a public, read-only OpenClaw control plane triage tool for opera
 
 **Auditable:** Inspect the entrypoint directly with `cat bin/control-plane-triage`.
 
+## Installation
+
+**curl install (no clone required):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash
+```
+
+For a user-only install (no sudo):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash -s -- --user
+```
+
+**From source:**
+
+```bash
+git clone https://github.com/CHE10X/octriageunit.git
+cd octriageunit
+bash scripts/install.sh          # system install (/usr/local/bin)
+bash scripts/install.sh --user   # user install (~/.local/bin)
+```
+
+**Verify installation matches source:**
+
+```bash
+bash scripts/install.sh --verify-from-source
+```
+
+**Uninstall:**
+
+```bash
+bash scripts/install.sh --uninstall
+# or see UNINSTALL.md for manual steps
+```
+
+
 ## Usage
 
 Run the tool locally:
