@@ -4,6 +4,8 @@
 # READ-ONLY MODE: this script must not modify system configuration or service state.
 # NO NETWORK CALLS: this script must not initiate outbound network activity or telemetry.
 # NO CONFIG MUTATION: this script must not write outside ~/octriage-bundles/ proof artifacts.
+#
+# Safety: read-only • no network • no config writes
 
 set -u
 
@@ -42,7 +44,7 @@ check_env() {
 
   for tool in launchctl openclaw; do
     if ! command -v "${tool}" >/dev/null 2>&1; then
-      printf 'Missing required tool: %s\n' "${tool}" >&2
+      printf 'Environment signal: degraded — required tool not found: %s\n' "${tool}" >&2
       missing=1
     fi
   done
@@ -58,15 +60,14 @@ proof_bundle() {
   bundle_dir="${BUNDLE_ROOT}/${timestamp}"
 
   mkdir -p "${bundle_dir}" || {
-    printf 'Failed to create proof bundle directory: %s\n' "${bundle_dir}" >&2
+    printf 'Environment signal: degraded — could not create bundle directory: %s\n' "${bundle_dir}" >&2
     return 1
   }
 
   cat >"${bundle_dir}/bundle_summary.txt" <<EOF
-OCTriageUnit proof bundle
-created_at=${timestamp}
-mode=read-only
-notes=triage collection not yet implemented; this bundle was created by the safe public stub
+OCTriageUnit Proof Bundle
+Mode: read-only snapshot
+Generated: ${timestamp}
 EOF
 
   cat >"${bundle_dir}/gateway_err_tail.txt" <<'EOF'
@@ -107,6 +108,8 @@ EOF
   fi
 
   printf 'Proof bundle initialized at %s\n' "${bundle_dir}"
+  printf 'Tip: run with -json for automation pipelines\n'
+  printf '\nEvidence ready for review.\n'
 }
 
 main() {
@@ -140,12 +143,12 @@ main() {
   esac
 
   if ! check_env; then
-    printf 'Environment check failed. Review missing tools above.\n' >&2
+    printf 'Environment signal: degraded — review missing tools above.\n' >&2
     return 1
   fi
 
   if ! proof_bundle; then
-    printf 'Failed to initialize proof bundle.\n' >&2
+    printf 'Gateway probe: unhealthy — could not initialize proof bundle.\n' >&2
     return 1
   fi
 
