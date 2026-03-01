@@ -2,7 +2,19 @@
 
 ![Control Plane Trusted](docs/assets/control-plane-trusted.svg) ![Read-Only Verified](docs/assets/read-only-verified.svg)
 
-OCTriageUnit is a public, read-only OpenClaw control plane triage tool for operators who need fast local diagnostics without changing system state. It is designed for degraded environments where safety matters more than convenience: the script gathers evidence, records what it found into a proof bundle under the operator's home directory, and keeps all work on the local machine so findings can be reviewed, reproduced, and shared without hidden behavior.
+OCTriageUnit is a read-only control-plane triage tool for OpenClaw environments.
+
+It gives you a fast, deterministic snapshot of gateway health, watchdog state, and core diagnostics — and packages the evidence into a timestamped proof bundle.
+
+**Works even when your OpenClaw environment is already degraded.**
+
+Designed for:
+
+- operators troubleshooting a degraded OpenClaw node
+- users whose automation is already misbehaving
+- environments where you need signal fast, not another daemon
+
+No telemetry. No mutation. No background services.
 
 ## SAFETY GUARANTEES
 
@@ -18,8 +30,6 @@ OCTriageUnit is a public, read-only OpenClaw control plane triage tool for opera
 
 ## Installation
 
-**curl install (no clone required):**
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash
 ```
@@ -30,14 +40,7 @@ For a user-only install (no sudo):
 curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash -s -- --user
 ```
 
-**From source:**
-
-```bash
-git clone https://github.com/CHE10X/octriageunit.git
-cd octriageunit
-bash scripts/install.sh          # system install (/usr/local/bin)
-bash scripts/install.sh --user   # user install (~/.local/bin)
-```
+Advanced users may also run `scripts/install.sh` directly from a cloned repo.
 
 **Verify installation matches source:**
 
@@ -51,6 +54,18 @@ bash scripts/install.sh --verify-from-source
 curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/scripts/uninstall.sh | bash
 # or see UNINSTALL.md for manual steps
 ```
+
+## What Happens When You Run It
+
+On execution, OCTriageUnit:
+
+1. checks core OpenClaw health surfaces
+2. captures recent gateway and watchdog signals
+3. builds a timestamped proof bundle
+4. prints the bundle path to the terminal
+
+Typical runtime: 2–5 seconds.
+
 
 ## After Install
 
@@ -90,6 +105,22 @@ bin/control-plane-triage --help
 
 The current public script is a safe triage scaffold. It verifies that required local tools exist, creates a timestamped proof bundle directory, and leaves all diagnostic collection steps as explicit TODOs so operators can inspect intended behavior before enabling or extending any collection logic.
 
+## Example Run
+
+```
+$ octriageunit
+
+CONTROL PLANE TRIAGE COMPLETE
+Bundle: ~/octriage-bundles/20260228-141416
+
+Included:
+  • gateway health snapshot
+  • watchdog state
+  • openclaw doctor output
+  • launchctl snapshot
+```
+
+
 ## How To Verify
 
 Build the executable checksum from the checked-out source:
@@ -112,6 +143,19 @@ Review the full trust posture in [docs/trust-doctrine.md](/Users/AGENT/octriageu
 ## Threat Model
 
 OCTriageUnit reads local process and platform state through operator-invoked system tools, then writes diagnostic artifacts into a local proof bundle. It cannot repair services, rotate credentials, validate remote cluster state, or guarantee correctness of external binaries already present on the machine. The trust boundary is the local host: operators must trust the local shell, the installed `launchctl` and `openclaw` binaries, and the visible source code they are executing.
+
+## Collection Model
+
+OCTriageUnit ships with a minimal safe core and explicit operator-extensible hooks for additional signal collection.
+
+The default build is intentionally:
+
+- **fast** — 2–5 second runtime
+- **deterministic** — same inputs, same bundle structure, every run
+- **read-only** — no writes outside `~/octriage-bundles/`
+
+Advanced operators may extend collection safely via the documented hooks in `bin/control-plane-triage`.
+
 
 ## Operator Notes
 

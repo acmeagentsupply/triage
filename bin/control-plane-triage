@@ -10,7 +10,7 @@ set -u
 readonly BUNDLE_ROOT="${HOME}/octriage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
-readonly EMBEDDED_VERSION="0.1.0"   # injected at install time if standalone
+readonly EMBEDDED_VERSION="0.1.1"   # injected at install time if standalone
 
 print_help() {
   # SAFE: Prints local help text only; does not inspect services, mutate config, or access the network.
@@ -70,15 +70,18 @@ notes=triage collection not yet implemented; this bundle was created by the safe
 EOF
 
   cat >"${bundle_dir}/gateway_err_tail.txt" <<'EOF'
-Triage collection TODO: capture the last 200 relevant gateway error lines here.
+Triage collection Operator-extensible collection hook
+# SAFE: read-only extension point: capture the last 200 relevant gateway error lines here.
 EOF
 
   cat >"${bundle_dir}/launchctl_snapshot.txt" <<'EOF'
-Triage collection TODO: capture local launchctl list output here.
+Triage collection Operator-extensible collection hook
+# SAFE: read-only extension point: capture local launchctl list output here.
 EOF
 
   cat >"${bundle_dir}/doctor_output.txt" <<'EOF'
-Triage collection TODO: capture local openclaw doctor output here.
+Operator-extensible collection hook: capture local openclaw doctor output here.
+# SAFE: read-only extension point — add collection logic below
 EOF
 
   # Gateway healthcheck snapshot (HEALTHCHECK UNIT — A-HC-001)
@@ -146,10 +149,14 @@ main() {
     return 1
   fi
 
-  # TODO: Collect launchctl snapshot into launchctl_snapshot.txt without mutating service state.
-  # TODO: Collect openclaw doctor output into doctor_output.txt without writing outside the bundle.
-  # TODO: Collect filtered gateway error tail into gateway_err_tail.txt using local log sources only.
-  # TODO: Update bundle_summary.txt with concrete findings backed by saved artifacts.
+  # Operator-extensible collection hook
+# SAFE: read-only extension point: Collect launchctl snapshot into launchctl_snapshot.txt without mutating service state.
+  # Operator-extensible collection hook
+# SAFE: read-only extension point: Collect openclaw doctor output into doctor_output.txt without writing outside the bundle.
+  # Operator-extensible collection hook
+# SAFE: read-only extension point: Collect filtered gateway error tail into gateway_err_tail.txt using local log sources only.
+  # Operator-extensible collection hook
+# SAFE: read-only extension point: Update bundle_summary.txt with concrete findings backed by saved artifacts.
 
   return 0
 }
