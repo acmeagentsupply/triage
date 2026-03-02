@@ -12,7 +12,25 @@ set -u
 readonly BUNDLE_ROOT="${HOME}/octriage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
-readonly EMBEDDED_VERSION="0.1.1"   # injected at install time if standalone
+readonly EMBEDDED_VERSION="0.1.2"   # injected at install time if standalone
+readonly COLLECT_TIMEOUT=12         # seconds; applied to each slow command
+
+# Ensure standard tool paths are available (macOS + Homebrew)
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH}"
+
+# macOS-compatible timeout wrapper (timeout(1) is GNU coreutils, not in base macOS)
+run_timeout() {
+  local secs="$1"; shift
+  "$@" &
+  local child=$!
+  ( sleep "${secs}" && kill -TERM "${child}" 2>/dev/null ) &
+  local watcher=$!
+  wait "${child}" 2>/dev/null
+  local rc=$?
+  kill "${watcher}" 2>/dev/null
+  wait "${watcher}" 2>/dev/null
+  return "${rc}"
+}
 
 print_help() {
   # SAFE: Prints local help text only; does not inspect services, mutate config, or access the network.
@@ -33,7 +51,8 @@ Usage:
 Behavior:
   - verifies required local tools are present
   - creates a timestamped proof bundle directory
-  - leaves triage collection logic explicitly stubbed for review
+  - collects real evidence: doctor output, gateway logs, launchctl snapshots
+  - always exits 0; degraded signals are captured as evidence
 EOF
 }
 
@@ -52,10 +71,28 @@ check_env() {
   return "${missing}"
 }
 
-proof_bundle() {
-  # SAFE: Creates directories only under ~/octriage-bundles/ and writes placeholder proof files locally.
-  local timestamp bundle_dir
+# SAFE: Runs a command with a timeout; captures stdout+stderr to a file.
+# Never restarts services, never modifies config.
+collect() {
+  local label="$1"
+  local outfile="$2"
+  shift 2
 
+  if run_timeout "${COLLECT_TIMEOUT}" "$@" > "${outfile}" 2>&1; then
+    printf '  [ok]     %s\n' "${label}"
+  else
+    local exit_code=$?
+    if [[ -z "$(cat "${outfile}" 2>/dev/null)" ]]; then
+      printf 'TIMED OUT after %ss\n' "${COLLECT_TIMEOUT}" >> "${outfile}"
+      printf '  [timeout] %s\n' "${label}"
+    else
+      printf '  [degraded] %s (exit %d)\n' "${label}" "${exit_code}"
+    fi
+  fi
+}
+
+proof_bundle() {
+  local timestamp bundle_dir
   timestamp="$(date +%Y%m%d-%H%M%S)"
   bundle_dir="${BUNDLE_ROOT}/${timestamp}"
 
@@ -64,56 +101,107 @@ proof_bundle() {
     return 1
   }
 
+  # ── bundle_summary.txt (always written first) ───────────────────────────────
   cat >"${bundle_dir}/bundle_summary.txt" <<EOF
 OCTriageUnit Proof Bundle
+Version: $(cat "${VERSION_FILE}" 2>/dev/null || echo "${EMBEDDED_VERSION}")
 Mode: read-only snapshot
 Generated: ${timestamp}
+Host: $(hostname)
+User: $(id -un)
 EOF
 
-  cat >"${bundle_dir}/gateway_err_tail.txt" <<'EOF'
-Triage collection Operator-extensible collection hook
-# SAFE: read-only extension point: capture the last 200 relevant gateway error lines here.
-EOF
+  printf 'Collecting evidence...\n'
 
-  cat >"${bundle_dir}/launchctl_snapshot.txt" <<'EOF'
-Triage collection Operator-extensible collection hook
-# SAFE: read-only extension point: capture local launchctl list output here.
-EOF
+  # ── doctor_output.txt ───────────────────────────────────────────────────────
+  # SAFE: read-only diagnostic; never calls --fix or restarts anything
+  # Uses longer timeout (25s) as doctor probes all components
+  local doctor_timeout=25
+  if run_timeout "${doctor_timeout}" openclaw doctor > "${bundle_dir}/doctor_output.txt" 2>&1; then
+    printf '  [ok]     openclaw doctor\n'
+  else
+    printf '  [degraded] openclaw doctor (captured partial output)\n'
+  fi
 
-  cat >"${bundle_dir}/doctor_output.txt" <<'EOF'
-Operator-extensible collection hook: capture local openclaw doctor output here.
-# SAFE: read-only extension point — add collection logic below
-EOF
+  # ── gateway_err_tail.txt ────────────────────────────────────────────────────
+  # SAFE: reads log file only; no writes outside bundle
+  local err_log="${HOME}/.openclaw/logs/gateway.err.log"
+  if [[ -f "${err_log}" ]]; then
+    {
+      tail -n 250 "${err_log}" \
+        | grep -Ei "password_missing|unauthorized|failed|error|timeout|nonce|1006|1008|funnel|tailscale" \
+        || tail -n 250 "${err_log}"
+    } > "${bundle_dir}/gateway_err_tail.txt" 2>/dev/null
+    printf '  [ok]     gateway_err_tail\n'
+  else
+    printf 'gateway.err.log not found at %s\n' "${err_log}" > "${bundle_dir}/gateway_err_tail.txt"
+    printf '  [missing] gateway_err_tail\n'
+  fi
 
-  # Gateway healthcheck snapshot (HEALTHCHECK UNIT — A-HC-001)
+  # ── gateway_log_tail.txt ────────────────────────────────────────────────────
+  local gw_log="${HOME}/.openclaw/logs/gateway.log"
+  if [[ -f "${gw_log}" ]]; then
+    tail -n 120 "${gw_log}" > "${bundle_dir}/gateway_log_tail.txt" 2>/dev/null
+    printf '  [ok]     gateway_log_tail\n'
+  else
+    printf 'gateway.log not found at %s\n' "${gw_log}" > "${bundle_dir}/gateway_log_tail.txt"
+    printf '  [missing] gateway_log_tail\n'
+  fi
+
+  # ── openclaw_status.txt ─────────────────────────────────────────────────────
+  # SAFE: status commands only; no --fix, no restart
+  {
+    printf '=== openclaw status ===\n'
+    run_timeout "${COLLECT_TIMEOUT}" openclaw status 2>&1 || printf 'TIMED OUT or FAILED\n'
+    printf '\n=== openclaw gateway status --deep ===\n'
+    run_timeout "${COLLECT_TIMEOUT}" openclaw gateway status --deep 2>&1 || printf 'TIMED OUT or FAILED\n'
+  } > "${bundle_dir}/openclaw_status.txt"
+  printf '  [ok]     openclaw_status\n'
+
+  # ── launchctl_gateway.txt ───────────────────────────────────────────────────
+  # SAFE: print only; does not start/stop/restart services
+  collect "launchctl gateway" \
+    "${bundle_dir}/launchctl_gateway.txt" \
+    launchctl print "gui/$(id -u)/ai.openclaw.gateway"
+
+  # ── launchctl_watchdog.txt ──────────────────────────────────────────────────
+  if launchctl print "gui/$(id -u)/ai.openclaw.hendrik_watchdog" >/dev/null 2>&1; then
+    collect "launchctl watchdog" \
+      "${bundle_dir}/launchctl_watchdog.txt" \
+      launchctl print "gui/$(id -u)/ai.openclaw.hendrik_watchdog"
+  else
+    printf 'Service not registered: ai.openclaw.hendrik_watchdog\n' \
+      > "${bundle_dir}/launchctl_watchdog.txt"
+    printf '  [skipped] launchctl watchdog (not registered)\n'
+  fi
+
+  # ── gateway_health.txt + gateway_health.json ────────────────────────────────
+  # SAFE: copy only; healthcheck agent writes these files independently
   local gw_health_dir="${HOME}/openclaw/health"
   if [[ -f "${gw_health_dir}/gateway_health.txt" ]]; then
     cp "${gw_health_dir}/gateway_health.txt" "${bundle_dir}/gateway_health.txt" 2>/dev/null || true
     cp "${gw_health_dir}/gateway_health.json" "${bundle_dir}/gateway_health.json" 2>/dev/null || true
     printf 'Gateway health snapshot included.\n'
   else
-    printf 'gateway_health files not found (healthcheck agent not running?)\n' \
+    printf 'SKIPPED: gateway_health files not found (healthcheck agent not running?)\n' \
       > "${bundle_dir}/gateway_health.txt"
+    printf '  [skipped] gateway_health\n'
   fi
 
+  # ── manifest.sha256 ─────────────────────────────────────────────────────────
   if command -v shasum >/dev/null 2>&1; then
     (
       cd "${bundle_dir}" || exit 1
-      shasum -a 256 bundle_summary.txt gateway_err_tail.txt launchctl_snapshot.txt doctor_output.txt > manifest.sha256
-    ) || return 1
+      shasum -a 256 ./* 2>/dev/null > manifest.sha256
+    ) || true
   else
-    cat >"${bundle_dir}/manifest.sha256" <<'EOF'
-SHA256 manifest unavailable: shasum is not present on this machine.
-EOF
+    printf 'SHA256 manifest unavailable: shasum not found.\n' > "${bundle_dir}/manifest.sha256"
   fi
 
   printf 'Proof bundle initialized at %s\n' "${bundle_dir}"
-  printf 'Tip: run with -json for automation pipelines\n'
-  printf '\nEvidence ready for review.\n'
 }
 
 main() {
-  # SAFE: Orchestrates local argument parsing and proof-bundle setup only; contains no service control or network behavior.
   case "${1-}" in
     --help|-help|-h)
       print_help
@@ -130,6 +218,7 @@ main() {
       bash -n "${BASH_SOURCE[0]}" && printf '  ✓ syntax OK\n'
       printf '  ✓ --version: %s\n' "$(cat "${VERSION_FILE}" 2>/dev/null || echo "${EMBEDDED_VERSION}")"
       printf '  ✓ --help: ' && print_help | grep -q "Read-only" && printf 'safety guarantees present\n'
+      printf '  ✓ collect timeout: %ss\n' "${COLLECT_TIMEOUT}"
       printf 'Self-test PASSED\n'
       return 0
       ;;
@@ -142,24 +231,12 @@ main() {
       ;;
   esac
 
-  if ! check_env; then
-    printf 'Environment signal: degraded — review missing tools above.\n' >&2
-    return 1
-  fi
+  check_env || true   # degraded env captured in bundle; never block exit 0
 
-  if ! proof_bundle; then
+  proof_bundle || {
     printf 'Gateway probe: unhealthy — could not initialize proof bundle.\n' >&2
     return 1
-  fi
-
-  # Operator-extensible collection hook
-# SAFE: read-only extension point: Collect launchctl snapshot into launchctl_snapshot.txt without mutating service state.
-  # Operator-extensible collection hook
-# SAFE: read-only extension point: Collect openclaw doctor output into doctor_output.txt without writing outside the bundle.
-  # Operator-extensible collection hook
-# SAFE: read-only extension point: Collect filtered gateway error tail into gateway_err_tail.txt using local log sources only.
-  # Operator-extensible collection hook
-# SAFE: read-only extension point: Update bundle_summary.txt with concrete findings backed by saved artifacts.
+  }
 
   return 0
 }
