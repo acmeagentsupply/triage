@@ -103,21 +103,43 @@ Show safety guarantees and usage:
 bin/control-plane-triage --help
 ```
 
-The current public script is a safe triage scaffold. It verifies that required local tools exist, creates a timestamped proof bundle directory, and leaves all diagnostic collection steps as explicit TODOs so operators can inspect intended behavior before enabling or extending any collection logic.
+As of v0.1.2, all collection is real — no placeholder stubs. Each run captures live evidence from the local host.
+
+## What Gets Collected
+
+| File | Source |
+|------|--------|
+| `bundle_summary.txt` | Version, timestamp, hostname |
+| `doctor_output.txt` | `openclaw doctor` (25s timeout) |
+| `gateway_err_tail.txt` | Filtered tail of `gateway.err.log` |
+| `gateway_log_tail.txt` | Last 120 lines of `gateway.log` |
+| `openclaw_status.txt` | `openclaw status` + `gateway status --deep` |
+| `launchctl_gateway.txt` | `launchctl print` for gateway service |
+| `launchctl_watchdog.txt` | `launchctl print` for watchdog service |
+| `gateway_health.txt/json` | Copied from healthcheck agent output |
+| `manifest.sha256` | SHA-256 checksums of all artifacts |
 
 ## Example Run
 
 ```
-$ octriageunit
+$ octriageunit --self-test && octriageunit
 
-CONTROL PLANE TRIAGE COMPLETE
-Bundle: ~/octriage-bundles/20260228-141416
+Self-test: checking syntax and flags...
+  ✓ syntax OK
+  ✓ --version: 0.1.2
+  ✓ --help: safety guarantees present
+  ✓ collect timeout: 12s
+Self-test PASSED
 
-Included:
-  • gateway health snapshot
-  • watchdog state
-  • openclaw doctor output
-  • launchctl snapshot
+Collecting evidence...
+  [ok]     openclaw doctor
+  [ok]     gateway_err_tail
+  [ok]     gateway_log_tail
+  [ok]     openclaw_status
+  [ok]     launchctl gateway
+  [ok]     launchctl watchdog
+Gateway health snapshot included.
+Proof bundle initialized at ~/octriage-bundles/20260302-122506
 ```
 
 
