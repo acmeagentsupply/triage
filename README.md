@@ -121,26 +121,29 @@ As of v0.1.2, all collection is real — no placeholder stubs. Each run captures
 
 ## Example Run
 
-```
-$ octriageunit --self-test && octriageunit
+Run self-test followed by a full triage collection:
 
-Self-test: checking syntax and flags...
-  ✓ syntax OK
-  ✓ --version: 0.1.2
-  ✓ --help: safety guarantees present
-  ✓ collect timeout: 12s
-Self-test PASSED
-
-Collecting evidence...
-  [ok]     openclaw doctor
-  [ok]     gateway_err_tail
-  [ok]     gateway_log_tail
-  [ok]     openclaw_status
-  [ok]     launchctl gateway
-  [ok]     launchctl watchdog
-Gateway health snapshot included.
-Proof bundle initialized at ~/octriage-bundles/20260302-122506
+```bash
+octriageunit --self-test && octriageunit
 ```
+
+![OCTriageUnit triage run](docs/images/triage-run-after.png)
+
+The bundle is written to `~/octriage-bundles/<timestamp>/` and contains real evidence files ready for review or support escalation.
+
+## Health Verification
+
+When the gateway is healthy, `openclaw gateway status --deep` returns three key signals:
+
+![Gateway health verification](docs/images/health-verification.png)
+
+```
+Runtime: running (pid <N>)
+RPC probe: ok
+Listening: 127.0.0.1:18789
+```
+
+If any of these are missing, run `octriageunit` immediately to capture a proof bundle before attempting any restart.
 
 
 ## How To Verify
