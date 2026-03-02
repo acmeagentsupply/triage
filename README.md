@@ -24,7 +24,7 @@ Then run:
 octriageunit --self-test && octriageunit
 ```
 
-![OCTriageUnit install and first run](docs/images/triage-run-after.png)
+![OCTriageUnit install and first run](docs/images/triage-hero.png)
 
 The bundle is written to `~/octriage-bundles/<timestamp>/` with real evidence files ready for review or support escalation.
 
