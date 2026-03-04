@@ -13,7 +13,7 @@ readonly BUNDLE_ROOT="${HOME}/octriage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
 readonly EMBEDDED_VERSION="0.1.4"   # injected at install time if standalone
-readonly COLLECT_TIMEOUT=12         # seconds; applied to each slow command
+readonly COLLECT_TIMEOUT=2          # seconds; applied to each slow command
 
 # Ensure standard tool paths are available (macOS + Homebrew)
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH}"
@@ -213,7 +213,7 @@ builder_summary() {
   local label="gui/$(id -u)/ai.openclaw.digest_builder"
   local launchctl_output
 
-  launchctl_output="$(launchctl print "${label}" 2>/dev/null || true)"
+  launchctl_output="$(run_timeout "${COLLECT_TIMEOUT}" launchctl print "${label}" 2>/dev/null || true)"
   [[ -n "${launchctl_output}" ]] || {
     printf 'NOT DETECTED'
     return 0
@@ -410,6 +410,27 @@ collect() {
   fi
 }
 
+collect_log_window() {
+  local logfile="$1"
+  local outfile="$2"
+  local filtered="${3:-0}"
+
+  [[ -f "${logfile}" ]] || return 1
+
+  if [[ "${filtered}" = "1" ]]; then
+    if run_timeout "${COLLECT_TIMEOUT}" bash -lc 'tail -n 2000 "$1" | head -n 200 | grep -Ei "password_missing|unauthorized|failed|error|timeout|nonce|1006|1008|funnel|tailscale" || tail -n 2000 "$1" | head -n 200' _ "${logfile}" > "${outfile}" 2>/dev/null; then
+      return 0
+    fi
+  else
+    if run_timeout "${COLLECT_TIMEOUT}" bash -lc 'tail -n 2000 "$1" | head -n 200' _ "${logfile}" > "${outfile}" 2>/dev/null; then
+      return 0
+    fi
+  fi
+
+  printf 'timeout\n' > "${outfile}"
+  return 0
+}
+
 proof_bundle() {
   local timestamp bundle_dir
   timestamp="$(date +%Y%m%d-%H%M%S)"
@@ -434,24 +455,17 @@ EOF
 
   # ── doctor_output.txt ───────────────────────────────────────────────────────
   # SAFE: read-only diagnostic; never calls --fix or restarts anything
-  # Uses longer timeout (25s) as doctor probes all components
-  local doctor_timeout=25
-  if run_timeout "${doctor_timeout}" openclaw doctor > "${bundle_dir}/doctor_output.txt" 2>&1; then
+  if run_timeout "${COLLECT_TIMEOUT}" openclaw doctor > "${bundle_dir}/doctor_output.txt" 2>&1; then
     printf '  [ok]     openclaw doctor\n'
   else
+    printf 'timeout\n' > "${bundle_dir}/doctor_output.txt"
     printf '  [degraded] openclaw doctor (captured partial output)\n'
   fi
 
   # ── gateway_err_tail.txt ────────────────────────────────────────────────────
   # SAFE: reads log file only; no writes outside bundle
   local err_log="${HOME}/.openclaw/ops/logs/gateway.err.log"
-  if [[ -f "${err_log}" ]]; then
-    {
-      tail -n 2000 "${err_log}" \
-        | head -n 200 \
-        | grep -Ei "password_missing|unauthorized|failed|error|timeout|nonce|1006|1008|funnel|tailscale" \
-        || tail -n 2000 "${err_log}" | head -n 200
-    } > "${bundle_dir}/gateway_err_tail.txt" 2>/dev/null
+  if collect_log_window "${err_log}" "${bundle_dir}/gateway_err_tail.txt" 1; then
     printf '  [ok]     gateway_err_tail\n'
   else
     printf 'gateway.err.log not found at %s\n' "${err_log}" > "${bundle_dir}/gateway_err_tail.txt"
@@ -460,8 +474,7 @@ EOF
 
   # ── gateway_log_tail.txt ────────────────────────────────────────────────────
   local gw_log="${HOME}/.openclaw/ops/logs/gateway.log"
-  if [[ -f "${gw_log}" ]]; then
-    tail -n 2000 "${gw_log}" | head -n 200 > "${bundle_dir}/gateway_log_tail.txt" 2>/dev/null
+  if collect_log_window "${gw_log}" "${bundle_dir}/gateway_log_tail.txt"; then
     printf '  [ok]     gateway_log_tail\n'
   else
     printf 'gateway.log not found at %s\n' "${gw_log}" > "${bundle_dir}/gateway_log_tail.txt"
@@ -485,7 +498,7 @@ EOF
     launchctl print "gui/$(id -u)/ai.openclaw.gateway"
 
   # ── launchctl_watchdog.txt ──────────────────────────────────────────────────
-  if launchctl print "gui/$(id -u)/ai.openclaw.hendrik_watchdog" >/dev/null 2>&1; then
+  if run_timeout "${COLLECT_TIMEOUT}" launchctl print "gui/$(id -u)/ai.openclaw.hendrik_watchdog" >/dev/null 2>&1; then
     collect "launchctl watchdog" \
       "${bundle_dir}/launchctl_watchdog.txt" \
       launchctl print "gui/$(id -u)/ai.openclaw.hendrik_watchdog"
