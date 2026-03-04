@@ -47,7 +47,11 @@ collector_run() {
     printf 'SKIPPED: gateway_health files not found (healthcheck agent not running?)\n' > "${bundle_dir}/gateway_health.txt"
   fi
 
-  if [[ -f "${bundle_dir}/gateway_health.txt" ]] && grep -Eiq 'healthy|gateway: ok|status: ok|HTTP 200|connected|ready' "${bundle_dir}/gateway_health.txt"; then
+  # Direct HTTP liveness probe (fast, authoritative — checked first)
+  if curl -sf --max-time 3 http://127.0.0.1:18789/ > /dev/null 2>&1; then
+    state="OK"
+    note="http_ok"
+  elif [[ -f "${bundle_dir}/gateway_health.txt" ]] && grep -Eiq 'healthy|gateway: ok|status: ok|HTTP 200|connected|ready' "${bundle_dir}/gateway_health.txt"; then
     state="OK"
   elif [[ -f "${bundle_dir}/gateway_health.txt" ]] && grep -Eiq 'degraded|fail|error|timeout|unhealthy|not ok' "${bundle_dir}/gateway_health.txt"; then
     state="WARN"
