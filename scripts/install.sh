@@ -104,6 +104,7 @@ run_verify_from_source() {
 do_install() {
   local prefix="$1"
   local dest="${prefix}/${BINARY_NAME}"
+  local checksum_file="${dest}.sha256"
   local ver
 
   mkdir -p "$prefix" || die "Cannot create directory: ${prefix}"
@@ -120,6 +121,7 @@ do_install() {
   fi
 
   chmod +x "$dest" || die "Cannot chmod: ${dest}"
+  printf '%s  %s\n' "$(sha256_file "${dest}")" "$(basename "${dest}")" > "${checksum_file}" || die "Cannot write checksum: ${checksum_file}"
   ok "Installed: ${dest}"
   ok "Version:   ${ver}"
   ok "SHA256:    $(sha256_file "${dest}")"
@@ -133,9 +135,11 @@ do_uninstall() {
   local removed=0
   for prefix in "${SYSTEM_PREFIX}" "${USER_PREFIX}"; do
     local dest="${prefix}/${BINARY_NAME}"
+    local checksum_file="${dest}.sha256"
     if [[ -f "$dest" ]]; then
       rm -f "$dest"; ok "Removed: ${dest}"; removed=$((removed+1))
     fi
+    [[ -f "${checksum_file}" ]] && rm -f "${checksum_file}"
   done
   [[ $removed -eq 0 ]] && info "Nothing to remove (octriageunit not found in standard locations)"
   info "Proof bundles in ~/octriage-bundles/ are NOT removed (your data)"

@@ -8,6 +8,9 @@ collector_run() {
   local gw_health_dir="${HOME}/openclaw/health"
   local state="UNKNOWN"
   local note=""
+  local probe_auth="SET"
+
+  [[ -n "${OPENCLAW_GATEWAY_PASSWORD:-}" ]] || probe_auth="MISSING"
 
   if collect_log_window "${err_log}" "${bundle_dir}/gateway_err_tail.txt" 1; then :; else
     printf 'gateway.err.log not found at %s\n' "${err_log}" > "${bundle_dir}/gateway_err_tail.txt"
@@ -47,10 +50,13 @@ collector_run() {
     printf 'SKIPPED: gateway_health files not found (healthcheck agent not running?)\n' > "${bundle_dir}/gateway_health.txt"
   fi
 
+  printf 'probe_auth: %s\n' "${probe_auth}" > "${bundle_dir}/gateway_probe_meta.txt"
+
   # Direct HTTP liveness probe (fast, authoritative — checked first)
-  if curl -sf --max-time 3 http://127.0.0.1:18789/ > /dev/null 2>&1; then
+  if curl -sf --max-time 1 http://127.0.0.1:18789/health > /dev/null 2>&1 || \
+     curl -sf --max-time 1 http://127.0.0.1:18789/ > /dev/null 2>&1; then
     state="OK"
-    note="http_ok"
+    note="liveness"
   elif [[ -f "${bundle_dir}/gateway_health.txt" ]] && grep -Eiq 'healthy|gateway: ok|status: ok|HTTP 200|connected|ready' "${bundle_dir}/gateway_health.txt"; then
     state="OK"
   elif [[ -f "${bundle_dir}/gateway_health.txt" ]] && grep -Eiq 'degraded|fail|error|timeout|unhealthy|not ok' "${bundle_dir}/gateway_health.txt"; then
@@ -61,7 +67,7 @@ collector_run() {
     note="errlog"
   fi
 
-  printf 'collector_status id=%s state=%s note=%s\n' "$COLLECTOR_ID" "$state" "${note:-none}"
+  printf 'collector_status id=%s state=%s note=%s probe_auth=%s\n' "$COLLECTOR_ID" "$state" "${note:-none}" "${probe_auth}"
   case "$state" in
     OK) return 0 ;;
     UNKNOWN) return 20 ;;

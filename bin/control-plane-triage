@@ -328,7 +328,13 @@ installed_cli_sha() {
 }
 
 expected_cli_sha() {
-  local manifest
+  local installed_path manifest
+
+  installed_path="$(command -v octriageunit 2>/dev/null || true)"
+  if [[ -n "${installed_path}" && -f "${installed_path}.sha256" ]]; then
+    awk '{print $1; exit}' "${installed_path}.sha256"
+    return 0
+  fi
 
   manifest="$(find "${SCRIPT_DIR}/../dist" -maxdepth 1 -type f -name 'octriageunit-*.sha256' 2>/dev/null | head -n 1)"
   if [[ -n "${manifest}" && -f "${manifest}" ]]; then
