@@ -12,7 +12,7 @@ set -u
 readonly BUNDLE_ROOT="${HOME}/octriage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
-readonly EMBEDDED_VERSION="0.1.3"   # injected at install time if standalone
+readonly EMBEDDED_VERSION="0.1.4"   # injected at install time if standalone
 readonly COLLECT_TIMEOUT=12         # seconds; applied to each slow command
 
 # Ensure standard tool paths are available (macOS + Homebrew)
@@ -30,6 +30,259 @@ run_timeout() {
   kill "${watcher}" 2>/dev/null
   wait "${watcher}" 2>/dev/null
   return "${rc}"
+}
+
+ui_enabled() {
+  [[ -t 1 ]] || return 1
+  [[ "${TERM:-}" = "dumb" ]] && return 1
+  [[ -n "${NO_COLOR:-}" ]] && return 1
+  return 0
+}
+
+color_wrap() {
+  local code="$1"
+  local text="$2"
+  if ui_enabled; then
+    printf '\033[%sm%s\033[0m' "${code}" "${text}"
+  else
+    printf '%s' "${text}"
+  fi
+}
+
+icon_for_state() {
+  local state="${1:-UNKNOWN}"
+  case "${state}" in
+    OK|HEALTHY|NORMAL|SCHEDULED)
+      printf '✓'
+      ;;
+    WARN*|DEGRADED*|HIGH_ACTIVITY)
+      printf '!'
+      ;;
+    STALE*|STOPPED*|FAIL*|FANOUT_ANOMALY)
+      printf '×'
+      ;;
+    NOT\ DETECTED|UNKNOWN*)
+      printf '·'
+      ;;
+    *)
+      printf '•'
+      ;;
+  esac
+}
+
+color_for_state() {
+  local state="${1:-UNKNOWN}"
+  case "${state}" in
+    OK|HEALTHY|NORMAL|SCHEDULED)
+      printf '32'
+      ;;
+    WARN*|DEGRADED*|HIGH_ACTIVITY)
+      printf '33'
+      ;;
+    STALE*|STOPPED*|FAIL*|FANOUT_ANOMALY)
+      printf '31'
+      ;;
+    NOT\ DETECTED|UNKNOWN*)
+      printf '90'
+      ;;
+    *)
+      printf '36'
+      ;;
+  esac
+}
+
+render_signal_line() {
+  local label="$1"
+  local summary="$2"
+  local state="${summary%% *}"
+  local icon color_code rendered
+
+  case "${summary}" in
+    NOT\ DETECTED*) state="NOT DETECTED" ;;
+    NOT\ SCHEDULED*) state="STOPPED" ;;
+    UNKNOWN*) state="UNKNOWN" ;;
+  esac
+
+  icon="$(icon_for_state "${state}")"
+  color_code="$(color_for_state "${state}")"
+  rendered="$(color_wrap "${color_code}" "${summary}")"
+
+  if ui_enabled; then
+    printf '%s %s: %s\n' "$(color_wrap "${color_code}" "${icon}")" "${label}" "${rendered}"
+  else
+    printf '%s: %s\n' "${label}" "${summary}"
+  fi
+}
+
+gateway_summary() {
+  local health_file="$1/gateway_health.txt"
+  local err_file="$1/gateway_err_tail.txt"
+
+  if [[ -f "${health_file}" ]]; then
+    if grep -Eiq 'healthy|gateway: ok|status: ok|HTTP 200|connected|ready' "${health_file}"; then
+      printf 'OK'
+      return 0
+    fi
+    if grep -Eiq 'degraded|fail|error|timeout|unhealthy|not ok' "${health_file}"; then
+      printf 'WARN'
+      return 0
+    fi
+  fi
+
+  if [[ -f "${err_file}" ]]; then
+    if grep -Eiq 'not found at ' "${err_file}"; then
+      printf 'UNKNOWN'
+      return 0
+    fi
+    if grep -Eiq 'error|failed|timeout|unauthorized|1006|1008|nonce|tailscale|funnel' "${err_file}"; then
+      printf 'WARN'
+      return 0
+    fi
+  fi
+
+  printf 'UNKNOWN'
+}
+
+sessions_summary() {
+  local sessions_root="${HOME}/.openclaw/agents"
+  local agents=0
+  local total=0
+  local recent=0
+  local max_agent_sessions=0
+  local session_count
+  local agent_dir
+
+  [[ -d "${sessions_root}" ]] || {
+    printf 'UNKNOWN'
+    return 0
+  }
+
+  while IFS= read -r -d '' agent_dir; do
+    session_count="$(find "${agent_dir}/sessions" -type f 2>/dev/null | wc -l | tr -d ' ')"
+    total=$(( total + session_count ))
+    recent=$(( recent + $(find "${agent_dir}/sessions" -type f -mmin -60 2>/dev/null | wc -l | tr -d ' ') ))
+    (( agents += 1 ))
+    (( session_count > max_agent_sessions )) && max_agent_sessions="${session_count}"
+  done < <(find "${sessions_root}" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+
+  if (( agents == 0 )); then
+    printf 'UNKNOWN'
+  elif (( recent >= 10 || total >= 50 )); then
+    printf 'HIGH_ACTIVITY (agents=%d recent=%d total=%d)' "${agents}" "${recent}" "${total}"
+  elif (( total >= 10 && max_agent_sessions * 100 / (total == 0 ? 1 : total) >= 70 )); then
+    printf 'FANOUT_ANOMALY (agents=%d recent=%d total=%d)' "${agents}" "${recent}" "${total}"
+  else
+    printf 'NORMAL (agents=%d recent=%d total=%d)' "${agents}" "${recent}" "${total}"
+  fi
+}
+
+digest_summary() {
+  local digest_path="${HOME}/.openclaw/workspace/DIGEST.md"
+  local generated_at
+  local stale_flag
+
+  [[ -f "${digest_path}" ]] || {
+    printf 'NOT DETECTED'
+    return 0
+  }
+
+  stale_flag="$(awk -F': ' '/^stale:/ {print $2; exit}' "${digest_path}" 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+  generated_at="$(awk -F': ' '/^generated_at_utc:/ {print $2; exit}' "${digest_path}" 2>/dev/null)"
+
+  if [[ "${stale_flag}" = "true" ]]; then
+    printf 'STALE'
+  elif [[ -n "${generated_at}" ]]; then
+    printf 'HEALTHY'
+  else
+    printf 'UNKNOWN'
+  fi
+}
+
+builder_summary() {
+  local label="gui/$(id -u)/ai.openclaw.digest_builder"
+  local launchctl_output
+
+  launchctl_output="$(launchctl print "${label}" 2>/dev/null || true)"
+  [[ -n "${launchctl_output}" ]] || {
+    printf 'NOT DETECTED'
+    return 0
+  }
+
+  if grep -q 'state = running' <<<"${launchctl_output}"; then
+    printf 'RUNNING'
+  elif grep -q 'state = not running' <<<"${launchctl_output}"; then
+    printf 'STOPPED'
+  else
+    printf 'SCHEDULED'
+  fi
+}
+
+disk_summary() {
+  local percent
+  percent="$(df -Pk "${HOME}" 2>/dev/null | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
+  [[ -n "${percent}" ]] || {
+    printf 'UNKNOWN'
+    return 0
+  }
+
+  if (( percent >= 90 )); then
+    printf 'FAIL (%s%% used)' "${percent}"
+  elif (( percent >= 80 )); then
+    printf 'WARN (%s%% used)' "${percent}"
+  else
+    printf 'OK (%s%% used)' "${percent}"
+  fi
+}
+
+overall_status() {
+  local gateway="$1"
+  local sessions="$2"
+  local digest="$3"
+  local builder="$4"
+  local disk="$5"
+
+  if [[ "${digest}" == STALE* || "${builder}" == STOPPED* || "${disk}" == FAIL* ]]; then
+    printf 'MEMORY SYSTEM FAILURE'
+  elif [[ "${gateway}" == WARN* || "${sessions}" == HIGH_ACTIVITY* || "${sessions}" == FANOUT_ANOMALY* || "${disk}" == WARN* ]]; then
+    printf 'DEGRADED'
+  else
+    printf 'SYSTEM HEALTHY'
+  fi
+}
+
+render_operator_brief() {
+  local bundle_dir="$1"
+  local gateway sessions digest builder disk status
+
+  gateway="$(gateway_summary "${bundle_dir}")"
+  sessions="$(sessions_summary)"
+  digest="$(digest_summary)"
+  builder="$(builder_summary)"
+  disk="$(disk_summary)"
+  status="$(overall_status "${gateway}" "${sessions}" "${digest}" "${builder}" "${disk}")"
+
+  printf '%s\n' "$(color_wrap '1;36' 'OpenClaw System Triage')"
+  printf 'Evidence bundle: %s\n' "${bundle_dir}"
+  render_signal_line "gateway" "${gateway}"
+  render_signal_line "sessions" "${sessions}"
+  render_signal_line "digest" "${digest}"
+  render_signal_line "builder" "${builder}"
+  render_signal_line "disk" "${disk}"
+  if ui_enabled; then
+    case "${status}" in
+      MEMORY\ SYSTEM\ FAILURE)
+        printf '%s %s\n' "$(color_wrap '1;31' 'STATUS:')" "$(color_wrap '1;31' "${status}")"
+        ;;
+      DEGRADED)
+        printf '%s %s\n' "$(color_wrap '1;33' 'STATUS:')" "$(color_wrap '1;33' "${status}")"
+        ;;
+      *)
+        printf '%s %s\n' "$(color_wrap '1;32' 'STATUS:')" "$(color_wrap '1;32' "${status}")"
+        ;;
+    esac
+  else
+    printf 'STATUS: %s\n' "${status}"
+  fi
 }
 
 print_help() {
@@ -199,6 +452,7 @@ EOF
   fi
 
   printf 'Proof bundle initialized at %s\n' "${bundle_dir}"
+  render_operator_brief "${bundle_dir}"
 }
 
 main() {
