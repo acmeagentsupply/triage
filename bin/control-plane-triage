@@ -12,7 +12,7 @@ set -u
 readonly BUNDLE_ROOT="${HOME}/octriage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
-readonly EMBEDDED_VERSION="0.1.2"   # injected at install time if standalone
+readonly EMBEDDED_VERSION="0.1.3"   # injected at install time if standalone
 readonly COLLECT_TIMEOUT=12         # seconds; applied to each slow command
 
 # Ensure standard tool paths are available (macOS + Homebrew)
@@ -125,7 +125,7 @@ EOF
 
   # ── gateway_err_tail.txt ────────────────────────────────────────────────────
   # SAFE: reads log file only; no writes outside bundle
-  local err_log="${HOME}/.openclaw/logs/gateway.err.log"
+  local err_log="${HOME}/.openclaw/ops/logs/gateway.err.log"
   if [[ -f "${err_log}" ]]; then
     {
       tail -n 250 "${err_log}" \
@@ -139,7 +139,7 @@ EOF
   fi
 
   # ── gateway_log_tail.txt ────────────────────────────────────────────────────
-  local gw_log="${HOME}/.openclaw/logs/gateway.log"
+  local gw_log="${HOME}/.openclaw/ops/logs/gateway.log"
   if [[ -f "${gw_log}" ]]; then
     tail -n 120 "${gw_log}" > "${bundle_dir}/gateway_log_tail.txt" 2>/dev/null
     printf '  [ok]     gateway_log_tail\n'
