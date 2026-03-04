@@ -12,7 +12,7 @@ set -u
 readonly BUNDLE_ROOT="${HOME}/octriage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
-readonly EMBEDDED_VERSION="0.1.4"   # injected at install time if standalone
+readonly EMBEDDED_VERSION="0.1.5"   # injected at install time if standalone
 readonly COLLECT_TIMEOUT=2          # seconds; applied to each slow command
 OCTU_COLOR_MODE="${OCTU_COLOR_MODE:-auto}"
 readonly COLLECTOR_DIR="${SCRIPT_DIR}/../lib/collectors.d"
@@ -806,9 +806,11 @@ EOF
     collector_pids+=($!)
   done
 
-  for pid in "${collector_pids[@]}"; do
-    wait "${pid}" 2>/dev/null || true
-  done
+  if ((${#collector_pids[@]} > 0)); then
+    for pid in "${collector_pids[@]}"; do
+      wait "${pid}" 2>/dev/null || true
+    done
+  fi
 
   cat "${status_dir}"/*.status > "${bundle_dir}/collector_status.txt" 2>/dev/null || true
 
