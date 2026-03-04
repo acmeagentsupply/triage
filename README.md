@@ -4,7 +4,7 @@
 
 OCTriageUnit is a read-only control-plane triage tool for OpenClaw environments.
 
-It gives you a fast, deterministic snapshot of gateway health, watchdog state, and core diagnostics — and packages the evidence into a timestamped proof bundle.
+It gives you a fast, deterministic snapshot of gateway health, builder state, and core diagnostics — and packages the evidence into a timestamped proof bundle.
 
 **Works even when your OpenClaw environment is already degraded.**
 
@@ -32,7 +32,13 @@ The bundle is written to `~/octriage-bundles/<timestamp>/` with real evidence fi
 
 ## Health Verification
 
-When the gateway is healthy, `openclaw gateway status --deep` returns three signals:
+As of v0.1.5, OCTriageUnit evaluates health in this order:
+
+- `gateway`: fast local liveness probe first, then healthcheck artifacts, then gateway error context
+- `builder`: loaded `launchctl` job with a healthy schedule reports `SCHEDULED`; missing label reports `STOPPED`
+- `verify`: compares the installed CLI SHA against an authoritative expected SHA when one is available
+
+When the gateway is healthy, the local runtime normally presents three signals:
 
 ![Gateway health verification](docs/images/health-verification.png)
 
@@ -44,11 +50,36 @@ Listening: 127.0.0.1:18789
 
 If any are missing, run `octriageunit` immediately to capture a proof bundle before attempting any restart.
 
+### Verify Behavior
+
+The summary includes a verification line:
+
+```text
+verify: installed_sha=<sha> expected_sha=<sha> MATCH
+```
+
+Rules:
+
+- `MATCH`: the installed CLI matches the recorded release checksum
+- `MISMATCH`: the installed CLI differs from a known expected checksum; this degrades status
+- `UNKNOWN`: no authoritative expected checksum was available, so OCTriageUnit reports the uncertainty without forcing a mismatch
+
+The installer records the installed checksum alongside the binary as `octriageunit.sha256`, and the verifier prefers that record when present.
+
+### Builder Classification
+
+The digest builder is classified conservatively:
+
+- `SCHEDULED`: launchd label is loaded and the scheduled job is healthy, even if it is idle between runs
+- `DEGRADED`: label is loaded but last exit or recent builder errors indicate trouble
+- `STALE`: label is loaded but digest freshness exceeds the expected interval
+- `STOPPED`: launchd label is not loaded
+
 ---
 
 ## What Gets Collected
 
-As of v0.1.2, all collection is real — no placeholder stubs.
+As of v0.1.5, all collection is real — no placeholder stubs.
 
 | File | Source |
 |------|--------|
@@ -60,6 +91,8 @@ As of v0.1.2, all collection is real — no placeholder stubs.
 | `launchctl_gateway.txt` | `launchctl print` for gateway service |
 | `launchctl_watchdog.txt` | `launchctl print` for watchdog service |
 | `gateway_health.txt/json` | Copied from healthcheck agent output |
+| `gateway_probe_meta.txt` | Local probe auth state used during gateway classification |
+| `verify_integrity.txt` | Installed CLI SHA, expected SHA, and verify state |
 | `manifest.sha256` | SHA-256 checksums of all artifacts |
 
 ---

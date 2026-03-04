@@ -18,6 +18,10 @@ This file is the operator-facing index for the bundle. It should record:
 
 This file should contain the last 200 relevant lines from the gateway error stream or equivalent local error source, with noisy or obviously irrelevant lines filtered out in a documented way. The goal is to preserve recent failure context without copying an entire log file into the bundle.
 
+### `gateway_probe_meta.txt`
+
+This file records gateway probe context used during classification, including whether probe authentication material was present. It helps distinguish an authentication gap from a true local liveness failure.
+
 ### `launchctl_snapshot.txt`
 
 This file should contain a snapshot of local service state from `launchctl list`. It provides a point-in-time view of launch-managed services that can be reviewed later without rerunning commands on the host.
@@ -25,6 +29,16 @@ This file should contain a snapshot of local service state from `launchctl list`
 ### `doctor_output.txt`
 
 This file should contain the output of `openclaw doctor`. It records what the local OpenClaw diagnostic command reported at the time the bundle was created.
+
+### `verify_integrity.txt`
+
+This file records three values for the installed CLI:
+
+- `installed_sha`
+- `expected_sha`
+- `state` (`MATCH`, `MISMATCH`, or `UNKNOWN`)
+
+`UNKNOWN` is valid when no authoritative expected checksum is available. In that case the bundle should preserve the uncertainty rather than guessing.
 
 ### `manifest.sha256`
 
