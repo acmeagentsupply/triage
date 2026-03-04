@@ -14,6 +14,9 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
 readonly EMBEDDED_VERSION="0.1.4"   # injected at install time if standalone
 readonly COLLECT_TIMEOUT=2          # seconds; applied to each slow command
+OCTU_COLOR_MODE="${OCTU_COLOR_MODE:-auto}"
+readonly COLLECTOR_DIR="${SCRIPT_DIR}/../lib/collectors.d"
+readonly STATUS_REDUCER="${SCRIPT_DIR}/../lib/status_reduce.sh"
 
 # Ensure standard tool paths are available (macOS + Homebrew)
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH}"
@@ -33,9 +36,21 @@ run_timeout() {
 }
 
 ui_enabled() {
-  [[ -t 1 ]] || return 1
-  [[ "${TERM:-}" = "dumb" ]] && return 1
+  if [[ "${CLICOLOR_FORCE:-0}" = "1" ]]; then
+    OCTU_COLOR_MODE="always"
+  fi
+
+  case "${OCTU_COLOR_MODE}" in
+    always)
+      return 0
+      ;;
+    never)
+      return 1
+      ;;
+  esac
+
   [[ -n "${NO_COLOR:-}" ]] && return 1
+  [[ "${TERM:-}" = "dumb" ]] && return 1
   return 0
 }
 
@@ -102,6 +117,16 @@ sha256_file() {
   fi
 }
 
+json_escape() {
+  local input="${1:-}"
+  input="${input//\\/\\\\}"
+  input="${input//\"/\\\"}"
+  input="${input//$'\n'/\\n}"
+  input="${input//$'\r'/\\r}"
+  input="${input//$'\t'/\\t}"
+  printf '%s' "${input}"
+}
+
 render_signal_line() {
   local label="$1"
   local summary="$2"
@@ -155,36 +180,39 @@ gateway_summary() {
 }
 
 sessions_summary() {
-  local sessions_root="${HOME}/.openclaw/agents"
-  local agents=0
-  local total=0
-  local recent=0
-  local max_agent_sessions=0
-  local session_count
-  local agent_dir
+  local topology_file="${OCTU_BUNDLE_DIR:-$1}/agent_session_topology.txt"
+  local classification agents recent orphan total
 
-  [[ -d "${sessions_root}" ]] || {
+  [[ -f "${topology_file}" ]] || {
     printf 'UNKNOWN'
     return 0
   }
 
-  while IFS= read -r -d '' agent_dir; do
-    session_count="$(find "${agent_dir}/sessions" -type f 2>/dev/null | wc -l | tr -d ' ')"
-    total=$(( total + session_count ))
-    recent=$(( recent + $(find "${agent_dir}/sessions" -type f -mmin -60 2>/dev/null | wc -l | tr -d ' ') ))
-    (( agents += 1 ))
-    (( session_count > max_agent_sessions )) && max_agent_sessions="${session_count}"
-  done < <(find "${sessions_root}" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+  classification="$(awk -F': ' '/^classification:/ {print $2; exit}' "${topology_file}" 2>/dev/null)"
+  agents="$(awk -F': ' '/^agents:/ {print $2; exit}' "${topology_file}" 2>/dev/null)"
+  recent="$(awk -F': ' '/^sessions_recent:/ {print $2; exit}' "${topology_file}" 2>/dev/null)"
+  orphan="$(awk -F': ' '/^orphan_transcripts:/ {print $2; exit}' "${topology_file}" 2>/dev/null)"
+  total="$(awk -F': ' '/^sessions_total:/ {print $2; exit}' "${topology_file}" 2>/dev/null)"
 
-  if (( agents == 0 )); then
+  printf '%s (agents=%s recent=%s orphan=%s total=%s)' \
+    "${classification:-UNKNOWN}" \
+    "${agents:-unknown}" \
+    "${recent:-unknown}" \
+    "${orphan:-unknown}" \
+    "${total:-unknown}"
+}
+
+lineage_summary() {
+  local topology_file="${OCTU_BUNDLE_DIR:-$1}/agent_session_topology.txt"
+  local lineage
+
+  [[ -f "${topology_file}" ]] || {
     printf 'UNKNOWN'
-  elif (( recent >= 10 || total >= 50 )); then
-    printf 'HIGH_ACTIVITY (agents=%d recent=%d total=%d)' "${agents}" "${recent}" "${total}"
-  elif (( total >= 10 && max_agent_sessions * 100 / (total == 0 ? 1 : total) >= 70 )); then
-    printf 'FANOUT_ANOMALY (agents=%d recent=%d total=%d)' "${agents}" "${recent}" "${total}"
-  else
-    printf 'NORMAL (agents=%d recent=%d total=%d)' "${agents}" "${recent}" "${total}"
-  fi
+    return 0
+  }
+
+  lineage="$(awk -F': ' '/^agent_lineage:/ {print $2; exit}' "${topology_file}" 2>/dev/null)"
+  printf '%s' "${lineage:-UNKNOWN}"
 }
 
 digest_summary() {
@@ -211,18 +239,24 @@ digest_summary() {
 
 builder_summary() {
   local label="gui/$(id -u)/ai.openclaw.digest_builder"
+  local launchctl_list
   local launchctl_output
+  local last_exit
+  local err_log="${HOME}/.openclaw/ops/digest_builder.err.log"
+
+  launchctl_list="$(run_timeout "${COLLECT_TIMEOUT}" launchctl list 2>/dev/null || true)"
+  if ! grep -q 'ai\.openclaw\.digest_builder' <<<"${launchctl_list}"; then
+    printf 'MISSING/UNLOADED'
+    return 0
+  fi
 
   launchctl_output="$(run_timeout "${COLLECT_TIMEOUT}" launchctl print "${label}" 2>/dev/null || true)"
-  [[ -n "${launchctl_output}" ]] || {
-    printf 'NOT DETECTED'
-    return 0
-  }
+  last_exit="$(awk -F'= ' '/last exit code = / {print $2; exit} /LastExitStatus = / {print $2; exit}' <<<"${launchctl_output}" 2>/dev/null)"
 
-  if grep -q 'state = running' <<<"${launchctl_output}"; then
-    printf 'RUNNING'
-  elif grep -q 'state = not running' <<<"${launchctl_output}"; then
-    printf 'STOPPED'
+  if [[ -n "${last_exit}" && "${last_exit}" != "0" ]]; then
+    printf 'DEGRADED'
+  elif [[ -f "${err_log}" ]] && tail -n 200 "${err_log}" 2>/dev/null | grep -Eiq 'permission denied|no such file|syntax error|traceback|fatal|exit 1|error|failed'; then
+    printf 'DEGRADED'
   else
     printf 'SCHEDULED'
   fi
@@ -246,18 +280,42 @@ disk_summary() {
 }
 
 overall_status() {
-  local gateway="$1"
-  local sessions="$2"
-  local digest="$3"
-  local builder="$4"
-  local disk="$5"
+  local verify_state="$1"
+  local lineage="$2"
+  local gateway="$3"
+  local sessions="$4"
+  local digest="$5"
+  local builder="$6"
+  local disk="$7"
 
-  if [[ "${digest}" == STALE* || "${builder}" == STOPPED* || "${disk}" == FAIL* ]]; then
-    printf 'MEMORY SYSTEM FAILURE'
-  elif [[ "${gateway}" == WARN* || "${sessions}" == HIGH_ACTIVITY* || "${sessions}" == FANOUT_ANOMALY* || "${disk}" == WARN* ]]; then
-    printf 'DEGRADED'
+  if [[ "${gateway}" == FAIL* || "${gateway}" == DOWN* ]]; then
+    printf 'FAILED|gateway_failure'
+  elif [[ "${digest}" == STALE* ]]; then
+    printf 'MEMORY SYSTEM FAILURE|digest=STALE'
+  elif [[ "${disk}" == FAIL* ]]; then
+    printf 'MEMORY SYSTEM FAILURE|disk=FAIL'
+  elif [[ "${builder}" == FAIL* ]]; then
+    printf 'MEMORY SYSTEM FAILURE|builder=FAIL'
+  elif [[ "${verify_state}" = "MISMATCH" ]]; then
+    printf 'DEGRADED|installed_mismatch'
+  elif [[ "${lineage}" != "OK" && "${lineage}" != "UNKNOWN" ]]; then
+    printf 'DEGRADED|agent_lineage'
+  elif [[ "${gateway}" == WARN* ]]; then
+    printf 'DEGRADED|gateway=WARN'
+  elif [[ "${sessions}" == FANOUT_ANOMALY* || "${sessions}" == HIGH_ACTIVITY* ]]; then
+    printf 'DEGRADED|session_store_integrity'
+  elif [[ "${builder}" == DEGRADED* ]]; then
+    printf 'DEGRADED|builder=DEGRADED'
+  elif [[ "${builder}" == MISSING/UNLOADED* ]]; then
+    printf 'DEGRADED|builder=MISSING_UNLOADED'
+  elif [[ "${sessions}" == HIGH_ACTIVITY* ]]; then
+    printf 'DEGRADED|sessions=HIGH_ACTIVITY'
+  elif [[ "${sessions}" == FANOUT_ANOMALY* ]]; then
+    printf 'DEGRADED|sessions=FANOUT_ANOMALY'
+  elif [[ "${disk}" == WARN* ]]; then
+    printf 'DEGRADED|disk=WARN'
   else
-    printf 'SYSTEM HEALTHY'
+    printf 'SYSTEM HEALTHY|reason=none'
   fi
 }
 
@@ -272,11 +330,13 @@ installed_cli_sha() {
 expected_cli_sha() {
   local manifest
 
-  for manifest in \
-    "${SCRIPT_DIR}/../SHA256SUMS" \
-    "${SCRIPT_DIR}/../dist/manifest.sha256" \
-    "${SCRIPT_DIR}/manifest.sha256"
-  do
+  manifest="$(find "${SCRIPT_DIR}/../dist" -maxdepth 1 -type f -name 'octriageunit-*.sha256' 2>/dev/null | head -n 1)"
+  if [[ -n "${manifest}" && -f "${manifest}" ]]; then
+    awk '{print $1; exit}' "${manifest}"
+    return 0
+  fi
+
+  for manifest in "${SCRIPT_DIR}/../dist/manifest.sha256" "${SCRIPT_DIR}/../SHA256SUMS" "${SCRIPT_DIR}/manifest.sha256"; do
     [[ -f "${manifest}" ]] || continue
     awk '/(bin\/control-plane-triage|octriageunit)$/ {print $1; exit}' "${manifest}"
     return 0
@@ -292,25 +352,192 @@ verify_summary() {
   expected_sha="$(expected_cli_sha 2>/dev/null || true)"
 
   if [[ -z "${installed_sha}" || -z "${expected_sha}" ]]; then
-    printf 'UNKNOWN'
+    printf '%s|%s|UNKNOWN' "${installed_sha:-unknown}" "${expected_sha:-unknown}"
   elif [[ "${installed_sha}" = "${expected_sha}" ]]; then
-    printf 'MATCH'
+    printf '%s|%s|MATCH' "${installed_sha}" "${expected_sha}"
   else
-    printf 'MISMATCH'
+    printf '%s|%s|MISMATCH' "${installed_sha}" "${expected_sha}"
   fi
+}
+
+canonical_expected_cli_sha_for_repo() {
+  local repo_root="$1"
+  local manifest
+
+  for manifest in \
+    "${repo_root}/dist/manifest.sha256" \
+    "${repo_root}/SHA256SUMS"
+  do
+    [[ -f "${manifest}" ]] || continue
+    awk '/(bin\/control-plane-triage|octriageunit)$/ {print $1; exit}' "${manifest}"
+    return 0
+  done
+
+  manifest="$(find "${repo_root}/dist" -maxdepth 1 -type f -name '*.sha256' 2>/dev/null | head -n 1)"
+  if [[ -n "${manifest}" && -f "${manifest}" ]]; then
+    awk '{print $1; exit}' "${manifest}"
+    return 0
+  fi
+
+  return 1
+}
+
+canonical_source_audit() {
+  local txt_out="$1"
+  local json_out="$2"
+  local -a search_roots=("${HOME}" "/usr/local" "/opt")
+  local -a repos=()
+  local -a marker_repos=()
+  local root gitdirs repo_root marker remote writable dirty
+  local repo_count=0
+  local capped="false"
+  local search_timeout="${COLLECT_TIMEOUT}"
+  local installed_path installed_sha installed_version
+  local canonical_repo=""
+  local expected_sha=""
+  local verify_state="UNKNOWN"
+  local version_match="UNKNOWN"
+  local repo_json=""
+  local marker_name=""
+
+  for root in "${search_roots[@]}"; do
+    [[ -d "${root}" ]] || continue
+    while IFS= read -r gitdirs; do
+      [[ -n "${gitdirs}" ]] || continue
+      repo_root="${gitdirs%/.git}"
+      repos+=("${repo_root}")
+      repo_count=$((repo_count + 1))
+      if (( repo_count >= 200 )); then
+        capped="true"
+        break 2
+      fi
+    done < <(run_timeout "${search_timeout}" find "${root}" -maxdepth 4 -name .git -type d 2>/dev/null || true)
+  done
+
+  installed_path="$(command -v octriageunit 2>/dev/null || true)"
+  installed_sha="$(installed_cli_sha 2>/dev/null || true)"
+  installed_version="$("${installed_path:-/usr/bin/false}" --version 2>/dev/null | awk '{print $2; exit}' || true)"
+
+  {
+    printf 'canonical_source_audit\n'
+    printf 'repos_scanned=%s\n' "${#repos[@]}"
+    printf 'repo_cap=200\n'
+    printf 'capped=%s\n' "${capped}"
+    printf 'installed_cli=%s\n' "${installed_path:-not found}"
+    printf 'installed_sha256=%s\n' "${installed_sha:-unknown}"
+    printf 'installed_version=%s\n' "${installed_version:-unknown}"
+  } > "${txt_out}"
+
+  repo_json='['
+  for repo_root in "${repos[@]}"; do
+    marker="false"
+    marker_name=""
+    if [[ -f "${repo_root}/OPENCLAW_CANONICAL_SOURCE.md" ]]; then
+      marker="true"
+      marker_name="OPENCLAW_CANONICAL_SOURCE.md"
+    elif [[ -f "${repo_root}/OPENCLAW_CANONONICAL_SOURCE.md" ]]; then
+      marker="true"
+      marker_name="OPENCLAW_CANONONICAL_SOURCE.md"
+    elif [[ -f "${repo_root}/CANONICAL_REPO" ]]; then
+      marker="true"
+      marker_name="CANONICAL_REPO"
+    fi
+
+    remote="$(run_timeout "${search_timeout}" git -C "${repo_root}" config --get remote.origin.url 2>/dev/null || true)"
+    writable="false"
+    [[ -w "${repo_root}" ]] && writable="true"
+
+    dirty="unknown"
+    if run_timeout "${search_timeout}" git -C "${repo_root}" status --porcelain >/tmp/octriage_status.$$ 2>/dev/null; then
+      if [[ -s /tmp/octriage_status.$$ ]]; then
+        dirty="true"
+      else
+        dirty="false"
+      fi
+    fi
+    rm -f /tmp/octriage_status.$$ 2>/dev/null || true
+
+    if [[ "${marker}" = "true" ]]; then
+      marker_repos+=("${repo_root}")
+      [[ -z "${canonical_repo}" ]] && canonical_repo="${repo_root}"
+    fi
+
+    {
+      printf '\nrepo=%s\n' "${repo_root}"
+      printf 'remote=%s\n' "${remote:-unknown}"
+      printf 'marker=%s\n' "${marker}"
+      printf 'marker_name=%s\n' "${marker_name:-none}"
+      printf 'writable=%s\n' "${writable}"
+      printf 'dirty=%s\n' "${dirty}"
+    } >> "${txt_out}"
+
+    [[ "${repo_json}" != "[" ]] && repo_json+=","
+    repo_json+="{\"repo_root\":\"$(json_escape "${repo_root}")\",\"remote\":\"$(json_escape "${remote:-unknown}")\",\"marker\":${marker},\"marker_name\":\"$(json_escape "${marker_name:-none}")\",\"writable\":${writable},\"dirty\":\"$(json_escape "${dirty}")\"}"
+  done
+  repo_json+=']'
+
+  if [[ -n "${canonical_repo}" ]]; then
+    expected_sha="$(canonical_expected_cli_sha_for_repo "${canonical_repo}" 2>/dev/null || true)"
+    if [[ -n "${expected_sha}" && -n "${installed_sha}" ]]; then
+      if [[ "${expected_sha}" = "${installed_sha}" ]]; then
+        verify_state="MATCH"
+      else
+        verify_state="MISMATCH"
+      fi
+    else
+      local canonical_version=""
+      canonical_version="$(tr -d '[:space:]' < "${canonical_repo}/VERSION" 2>/dev/null || true)"
+      if [[ -n "${canonical_version}" && -n "${installed_version}" ]]; then
+        if [[ "${canonical_version}" = "${installed_version}" ]]; then
+          version_match="MATCH"
+        else
+          version_match="MISMATCH"
+        fi
+      fi
+    fi
+  fi
+
+  {
+    printf '\ncanonical_repo=%s\n' "${canonical_repo:-not found}"
+    printf 'canonical_expected_sha256=%s\n' "${expected_sha:-unknown}"
+    printf 'installed_vs_canonical=%s\n' "${verify_state}"
+    printf 'version_fallback=%s\n' "${version_match}"
+  } >> "${txt_out}"
+
+  cat > "${json_out}" <<EOF
+{"repos_scanned":${#repos[@]},"repo_cap":200,"capped":${capped},"installed_cli":"$(json_escape "${installed_path:-not found}")","installed_sha256":"$(json_escape "${installed_sha:-unknown}")","installed_version":"$(json_escape "${installed_version:-unknown}")","canonical_repo":"$(json_escape "${canonical_repo:-not found}")","canonical_expected_sha256":"$(json_escape "${expected_sha:-unknown}")","installed_vs_canonical":"$(json_escape "${verify_state}")","version_fallback":"$(json_escape "${version_match}")","repos":${repo_json}}
+EOF
 }
 
 render_operator_brief() {
   local bundle_dir="$1"
-  local gateway sessions digest builder disk status verify_status
+  local gateway sessions digest builder disk status verify_status status_with_reason reason verify_installed_sha verify_expected_sha lineage status_token
 
   gateway="$(gateway_summary "${bundle_dir}")"
-  sessions="$(sessions_summary)"
+  sessions="$(sessions_summary "${bundle_dir}")"
+  lineage="$(lineage_summary "${bundle_dir}")"
   digest="$(digest_summary)"
   builder="$(builder_summary)"
   disk="$(disk_summary)"
   verify_status="$(verify_summary)"
-  status="$(overall_status "${gateway}" "${sessions}" "${digest}" "${builder}" "${disk}")"
+  verify_installed_sha="${verify_status%%|*}"
+  verify_status="${verify_status#*|}"
+  verify_expected_sha="${verify_status%%|*}"
+  verify_status="${verify_status##*|}"
+  status_with_reason="$(overall_status "${verify_status}" "${lineage}" "${gateway}" "${sessions}" "${digest}" "${builder}" "${disk}")"
+  status="${status_with_reason%%|*}"
+  reason="${status_with_reason#*|}"
+  case "${status}" in
+    SYSTEM\ HEALTHY)
+      status_token="HEALTHY"
+      ;;
+    DEGRADED)
+      status_token="DEGRADED"
+      ;;
+    *)
+      status_token="FAILED"
+      ;;
+  esac
 
   printf '%s\n' "$(color_wrap '1;36' 'OpenClaw System Triage')"
   printf 'Evidence bundle: %s\n' "${bundle_dir}"
@@ -322,32 +549,40 @@ render_operator_brief() {
   if ui_enabled; then
     case "${verify_status}" in
       MATCH)
-        printf 'verify: %s\n' "$(color_wrap '32' "${verify_status}")"
+        printf 'verify: installed_sha=%s expected_sha=%s %s\n' "${verify_installed_sha:0:8}" "${verify_expected_sha:0:8}" "$(color_wrap '32' "${verify_status}")"
         ;;
       MISMATCH)
-        printf 'verify: %s\n' "$(color_wrap '31' "${verify_status}")"
+        printf 'verify: installed_sha=%s expected_sha=%s %s\n' "${verify_installed_sha:0:8}" "${verify_expected_sha:0:8}" "$(color_wrap '31' "${verify_status}")"
         ;;
       *)
-        printf 'verify: %s\n' "$(color_wrap '90' "${verify_status}")"
+        printf 'verify: installed_sha=%s expected_sha=%s %s\n' "${verify_installed_sha:0:8}" "${verify_expected_sha:0:8}" "$(color_wrap '90' "${verify_status}")"
         ;;
     esac
   else
-    printf 'verify: %s\n' "${verify_status}"
+    printf 'verify: installed_sha=%s expected_sha=%s %s\n' "${verify_installed_sha:0:8}" "${verify_expected_sha:0:8}" "${verify_status}"
   fi
   if ui_enabled; then
-    case "${status}" in
-      MEMORY\ SYSTEM\ FAILURE)
-        printf '%s %s\n' "$(color_wrap '1;31' 'STATUS:')" "$(color_wrap '1;31' "${status}")"
+    case "${status_token}" in
+      FAILED)
+        printf '%s %s (%s)\n' "$(color_wrap '1;31' 'STATUS:')" "$(color_wrap '1;31' "[${status_token}]")" "${reason}"
         ;;
       DEGRADED)
-        printf '%s %s\n' "$(color_wrap '1;33' 'STATUS:')" "$(color_wrap '1;33' "${status}")"
+        printf '%s %s (%s)\n' "$(color_wrap '1;33' 'STATUS:')" "$(color_wrap '1;33' "[${status_token}]")" "${reason}"
         ;;
       *)
-        printf '%s %s\n' "$(color_wrap '1;32' 'STATUS:')" "$(color_wrap '1;32' "${status}")"
+        if [[ "${reason}" = "reason=none" ]]; then
+          printf '%s %s\n' "$(color_wrap '1;32' 'STATUS:')" "$(color_wrap '1;32' "[${status_token}]")"
+        else
+          printf '%s %s (%s)\n' "$(color_wrap '1;32' 'STATUS:')" "$(color_wrap '1;32' "[${status_token}]")" "${reason}"
+        fi
         ;;
     esac
   else
-    printf 'STATUS: %s\n' "${status}"
+    if [[ "${reason}" = "reason=none" ]]; then
+      printf 'STATUS: [%s]\n' "${status_token}"
+    else
+      printf 'STATUS: [%s] (%s)\n' "${status_token}" "${reason}"
+    fi
   fi
 }
 
@@ -366,6 +601,7 @@ Usage:
   bin/control-plane-triage --help
   bin/control-plane-triage --version
   bin/control-plane-triage --self-test
+  bin/control-plane-triage --color=auto|always|never
 
 Behavior:
   - verifies required local tools are present
@@ -431,15 +667,120 @@ collect_log_window() {
   return 0
 }
 
+collect_session_topology() {
+  local outfile="$1"
+  local sessions_root="${HOME}/.openclaw/agents"
+  local cli_json="${BUNDLE_ROOT}/.sessions_cli_$$.json"
+  local agents=0
+  local total=0
+  local recent=0
+  local orphan=0
+  local active="unknown"
+  local classification="UNKNOWN"
+  local agent_lineage="UNKNOWN"
+  local max_children=0
+  local parent child pair_count
+  local agent_dir sessions_dir agent_name transcript ref_file session_file ref_count
+
+  [[ -d "${sessions_root}" ]] || {
+    cat > "${outfile}" <<EOF
+classification: UNKNOWN
+agents: 0
+active_sessions: unknown
+sessions_total: 0
+sessions_recent: 0
+orphan_transcripts: 0
+agent_lineage: UNKNOWN
+max_context_usage: unknown
+EOF
+    return 0
+  }
+
+  if run_timeout "${COLLECT_TIMEOUT}" openclaw sessions -json > "${cli_json}" 2>/dev/null; then
+    active="$(grep -Eo '"(session_id|sessionId|id)"' "${cli_json}" 2>/dev/null | wc -l | tr -d ' ')"
+    [[ -n "${active}" ]] || active="unknown"
+    max_children="$(grep -Eo '"parent(Id|_id)"[[:space:]]*:[[:space:]]*"[^"]+"' "${cli_json}" 2>/dev/null | sed -E 's/.*"([^"]+)"$/\1/' | sort | uniq -c | awk 'BEGIN{m=0} {if ($1>m) m=$1} END{print m+0}')"
+    if grep -Eq '"(id|sessionId|session_id)"[[:space:]]*:[[:space:]]*"([^"]+)".*"parent(Id|_id)"[[:space:]]*:[[:space:]]*"\2"' "${cli_json}" 2>/dev/null; then
+      agent_lineage="LOOP"
+    elif grep -Eq '"parent(Id|_id)"[[:space:]]*:[[:space:]]*"[^"]+"' "${cli_json}" 2>/dev/null && ! grep -Eq '"(id|sessionId|session_id)"[[:space:]]*:[[:space:]]*"[^"]+"' "${cli_json}" 2>/dev/null; then
+      agent_lineage="BROKEN"
+    elif grep -Eq '"parent(Id|_id)"[[:space:]]*:[[:space:]]*"[^"]+"' "${cli_json}" 2>/dev/null; then
+      while IFS= read -r parent; do
+        [[ -n "${parent}" ]] || continue
+        if ! grep -Fq "\"${parent}\"" "${cli_json}" 2>/dev/null; then
+          agent_lineage="BROKEN"
+          break
+        fi
+      done < <(grep -Eo '"parent(Id|_id)"[[:space:]]*:[[:space:]]*"[^"]+"' "${cli_json}" 2>/dev/null | sed -E 's/.*"([^"]+)"$/\1/' | sort -u)
+      if [[ "${agent_lineage}" = "UNKNOWN" || "${agent_lineage}" = "OK" ]]; then
+        if (( max_children > 10 )); then
+          agent_lineage="FANOUT (children>10)"
+        else
+          agent_lineage="OK"
+        fi
+      fi
+    else
+      agent_lineage="OK"
+    fi
+  fi
+
+  while IFS= read -r -d '' agent_dir; do
+    sessions_dir="${agent_dir}/sessions"
+    [[ -d "${sessions_dir}" ]] || continue
+    agents=$((agents + 1))
+    agent_name="$(basename "${agent_dir}")"
+    ref_file="${sessions_dir}/sessions.json"
+
+    while IFS= read -r -d '' session_file; do
+      [[ "$(basename "${session_file}")" = "sessions.json" ]] && continue
+      total=$((total + 1))
+      if find "${session_file}" -prune -mmin -60 | grep -q . 2>/dev/null; then
+        recent=$((recent + 1))
+      fi
+      if [[ -f "${ref_file}" ]]; then
+        if ! grep -Fq "\"$(basename "${session_file}" .json)\"" "${ref_file}" 2>/dev/null; then
+          orphan=$((orphan + 1))
+        fi
+      else
+        orphan=$((orphan + 1))
+      fi
+    done < <(find "${sessions_dir}" -maxdepth 1 -type f -name '*.json' -print0 2>/dev/null)
+  done < <(find "${sessions_root}" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+
+  if (( orphan > 0 || total > 50 )); then
+    classification="FANOUT_ANOMALY"
+  elif (( recent > 10 )); then
+    classification="HIGH_ACTIVITY"
+  elif (( agents > 0 )); then
+    classification="NORMAL"
+  fi
+
+  cat > "${outfile}" <<EOF
+classification: ${classification}
+agents: ${agents}
+active_sessions: ${active}
+sessions_total: ${total}
+sessions_recent: ${recent}
+orphan_transcripts: ${orphan}
+agent_lineage: ${agent_lineage}
+max_context_usage: unknown
+EOF
+
+  rm -f "${cli_json}" 2>/dev/null || true
+}
+
 proof_bundle() {
-  local timestamp bundle_dir
+  local timestamp bundle_dir status_dir collector_file collector_status_file
+  local -a collector_pids=()
   timestamp="$(date +%Y%m%d-%H%M%S)"
   bundle_dir="${BUNDLE_ROOT}/${timestamp}"
+  status_dir="${bundle_dir}/.collector-status"
 
   mkdir -p "${bundle_dir}" || {
     printf 'Environment signal: degraded — could not create bundle directory: %s\n' "${bundle_dir}" >&2
     return 1
   }
+  mkdir -p "${status_dir}" || return 1
 
   # ── bundle_summary.txt (always written first) ───────────────────────────────
   cat >"${bundle_dir}/bundle_summary.txt" <<EOF
@@ -453,73 +794,23 @@ EOF
 
   printf 'Collecting evidence...\n'
 
-  # ── doctor_output.txt ───────────────────────────────────────────────────────
-  # SAFE: read-only diagnostic; never calls --fix or restarts anything
-  if run_timeout "${COLLECT_TIMEOUT}" openclaw doctor > "${bundle_dir}/doctor_output.txt" 2>&1; then
-    printf '  [ok]     openclaw doctor\n'
-  else
-    printf 'timeout\n' > "${bundle_dir}/doctor_output.txt"
-    printf '  [degraded] openclaw doctor (captured partial output)\n'
-  fi
+  for collector_file in "${COLLECTOR_DIR}"/*.sh; do
+    [[ -f "${collector_file}" ]] || continue
+    collector_status_file="${status_dir}/$(basename "${collector_file}" .sh).status"
+    (
+      unset COLLECTOR_ID COLLECTOR_LABEL
+      unset -f collector_run 2>/dev/null || true
+      source "${collector_file}"
+      collector_run "${bundle_dir}"
+    ) > "${collector_status_file}" 2>> "${bundle_dir}/collector_debug.log" &
+    collector_pids+=($!)
+  done
 
-  # ── gateway_err_tail.txt ────────────────────────────────────────────────────
-  # SAFE: reads log file only; no writes outside bundle
-  local err_log="${HOME}/.openclaw/ops/logs/gateway.err.log"
-  if collect_log_window "${err_log}" "${bundle_dir}/gateway_err_tail.txt" 1; then
-    printf '  [ok]     gateway_err_tail\n'
-  else
-    printf 'gateway.err.log not found at %s\n' "${err_log}" > "${bundle_dir}/gateway_err_tail.txt"
-    printf '  [missing] gateway_err_tail\n'
-  fi
+  for pid in "${collector_pids[@]}"; do
+    wait "${pid}" 2>/dev/null || true
+  done
 
-  # ── gateway_log_tail.txt ────────────────────────────────────────────────────
-  local gw_log="${HOME}/.openclaw/ops/logs/gateway.log"
-  if collect_log_window "${gw_log}" "${bundle_dir}/gateway_log_tail.txt"; then
-    printf '  [ok]     gateway_log_tail\n'
-  else
-    printf 'gateway.log not found at %s\n' "${gw_log}" > "${bundle_dir}/gateway_log_tail.txt"
-    printf '  [missing] gateway_log_tail\n'
-  fi
-
-  # ── openclaw_status.txt ─────────────────────────────────────────────────────
-  # SAFE: status commands only; no --fix, no restart
-  {
-    printf '=== openclaw status ===\n'
-    run_timeout "${COLLECT_TIMEOUT}" openclaw status 2>&1 || printf 'TIMED OUT or FAILED\n'
-    printf '\n=== openclaw gateway status --deep ===\n'
-    run_timeout "${COLLECT_TIMEOUT}" openclaw gateway status --deep 2>&1 || printf 'TIMED OUT or FAILED\n'
-  } > "${bundle_dir}/openclaw_status.txt"
-  printf '  [ok]     openclaw_status\n'
-
-  # ── launchctl_gateway.txt ───────────────────────────────────────────────────
-  # SAFE: print only; does not start/stop/restart services
-  collect "launchctl gateway" \
-    "${bundle_dir}/launchctl_gateway.txt" \
-    launchctl print "gui/$(id -u)/ai.openclaw.gateway"
-
-  # ── launchctl_watchdog.txt ──────────────────────────────────────────────────
-  if run_timeout "${COLLECT_TIMEOUT}" launchctl print "gui/$(id -u)/ai.openclaw.hendrik_watchdog" >/dev/null 2>&1; then
-    collect "launchctl watchdog" \
-      "${bundle_dir}/launchctl_watchdog.txt" \
-      launchctl print "gui/$(id -u)/ai.openclaw.hendrik_watchdog"
-  else
-    printf 'Service not registered: ai.openclaw.hendrik_watchdog\n' \
-      > "${bundle_dir}/launchctl_watchdog.txt"
-    printf '  [skipped] launchctl watchdog (not registered)\n'
-  fi
-
-  # ── gateway_health.txt + gateway_health.json ────────────────────────────────
-  # SAFE: copy only; healthcheck agent writes these files independently
-  local gw_health_dir="${HOME}/openclaw/health"
-  if [[ -f "${gw_health_dir}/gateway_health.txt" ]]; then
-    cp "${gw_health_dir}/gateway_health.txt" "${bundle_dir}/gateway_health.txt" 2>/dev/null || true
-    cp "${gw_health_dir}/gateway_health.json" "${bundle_dir}/gateway_health.json" 2>/dev/null || true
-    printf 'Gateway health snapshot included.\n'
-  else
-    printf 'SKIPPED: gateway_health files not found (healthcheck agent not running?)\n' \
-      > "${bundle_dir}/gateway_health.txt"
-    printf '  [skipped] gateway_health\n'
-  fi
+  cat "${status_dir}"/*.status > "${bundle_dir}/collector_status.txt" 2>/dev/null || true
 
   # ── manifest.sha256 ─────────────────────────────────────────────────────────
   if command -v shasum >/dev/null 2>&1; then
@@ -532,38 +823,46 @@ EOF
   fi
 
   printf 'Proof bundle initialized at %s\n' "${bundle_dir}"
-  render_operator_brief "${bundle_dir}"
+  source "${STATUS_REDUCER}"
+  octu_render_from_statuses "${bundle_dir}" "${bundle_dir}/collector_status.txt"
 }
 
 main() {
-  case "${1-}" in
-    --help|-help|-h)
-      print_help
-      return 0
-      ;;
-    --version|-version)
-      local ver
-      ver="$(cat "${VERSION_FILE}" 2>/dev/null || echo "${EMBEDDED_VERSION}")"
-      printf 'octriageunit %s\n' "${ver}"
-      return 0
-      ;;
-    --self-test|-self-test)
-      printf 'Self-test: checking syntax and flags...\n'
-      bash -n "${BASH_SOURCE[0]}" && printf '  ✓ syntax OK\n'
-      printf '  ✓ --version: %s\n' "$(cat "${VERSION_FILE}" 2>/dev/null || echo "${EMBEDDED_VERSION}")"
-      printf '  ✓ --help: ' && print_help | grep -q "Read-only" && printf 'safety guarantees present\n'
-      printf '  ✓ collect timeout: %ss\n' "${COLLECT_TIMEOUT}"
-      printf 'Self-test PASSED\n'
-      return 0
-      ;;
-    "")
-      ;;
-    *)
-      printf 'Unknown argument: %s\n\n' "${1}" >&2
-      print_help >&2
-      return 2
-      ;;
-  esac
+  while (($# > 0)); do
+    case "${1-}" in
+      --help|-help|-h)
+        print_help
+        return 0
+        ;;
+      --version|-version)
+        local ver
+        ver="$(cat "${VERSION_FILE}" 2>/dev/null || echo "${EMBEDDED_VERSION}")"
+        printf 'octriageunit %s\n' "${ver}"
+        return 0
+        ;;
+      --self-test|-self-test)
+        printf 'Self-test: checking syntax and flags...\n'
+        bash -n "${BASH_SOURCE[0]}" && printf '  ✓ syntax OK\n'
+        printf '  ✓ --version: %s\n' "$(cat "${VERSION_FILE}" 2>/dev/null || echo "${EMBEDDED_VERSION}")"
+        printf '  ✓ --help: ' && print_help | grep -q "Read-only" && printf 'safety guarantees present\n'
+        printf '  ✓ collect timeout: %ss\n' "${COLLECT_TIMEOUT}"
+        printf '  ✓ color mode: %s\n' "${OCTU_COLOR_MODE}"
+        printf 'Self-test PASSED\n'
+        return 0
+        ;;
+      --color=auto|--color=always|--color=never)
+        OCTU_COLOR_MODE="${1#--color=}"
+        ;;
+      "")
+        ;;
+      *)
+        printf 'Unknown argument: %s\n\n' "${1}" >&2
+        print_help >&2
+        return 2
+        ;;
+    esac
+    shift
+  done
 
   check_env || true   # degraded env captured in bundle; never block exit 0
 
