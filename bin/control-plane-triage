@@ -263,19 +263,24 @@ builder_summary() {
 }
 
 disk_summary() {
-  local percent
-  percent="$(df -Pk "${HOME}" 2>/dev/null | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
+  # Canonical metric: root volume (/) percent used — matches ORP disk calculation.
+  # $HOME was retired (measured home-volume scope, differed from ORP's / scope).
+  local percent avail_human oc_size
+  percent="$(df -Pk / 2>/dev/null | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
+  avail_human="$(df -h / 2>/dev/null | awk 'NR==2 {print $4}')"
+  oc_size="$(du -sh "${HOME}/.openclaw" 2>/dev/null | awk '{print $1}')"
   [[ -n "${percent}" ]] || {
     printf 'UNKNOWN'
     return 0
   }
 
+  local detail="${percent}%% used, ${avail_human:-?} avail, openclaw=${oc_size:-?}"
   if (( percent >= 90 )); then
-    printf 'FAIL (%s%% used)' "${percent}"
+    printf 'FAIL (%s)' "${detail}"
   elif (( percent >= 80 )); then
-    printf 'WARN (%s%% used)' "${percent}"
+    printf 'WARN (%s)' "${detail}"
   else
-    printf 'OK (%s%% used)' "${percent}"
+    printf 'OK (%s)' "${detail}"
   fi
 }
 
@@ -590,6 +595,54 @@ render_operator_brief() {
       printf 'STATUS: [%s] (%s)\n' "${status_token}" "${reason}"
     fi
   fi
+
+  # ── OpenClaw Observe section ──────────────────────────────────────────────
+  local _obs_snap="${HOME}/.openclaw/workspace/reports/observe_snapshot.json"
+  local _obs_agents="-" _obs_sessions="-" _obs_orphans="-"
+  local _obs_alerts="-" _obs_gw="-" _obs_score="-" _obs_state="-"
+
+  if command -v python3 >/dev/null 2>&1 && [[ -f "${_obs_snap}" ]]; then
+    # Run aggregator first to refresh (non-blocking, exits 0)
+    python3 "${HOME}/.openclaw/watchdog/observe_aggregator.py" >/dev/null 2>&1 || true
+    # Parse snapshot
+    _obs_agents=$(python3 -c "import json; d=json.load(open('${_obs_snap}')); print(d.get('agents','-'))" 2>/dev/null || echo "-")
+    _obs_sessions=$(python3 -c "import json; d=json.load(open('${_obs_snap}')); print(d.get('sessions','-'))" 2>/dev/null || echo "-")
+    _obs_orphans=$(python3 -c "import json; d=json.load(open('${_obs_snap}')); print(d.get('orphan_sessions','-'))" 2>/dev/null || echo "-")
+    _obs_alerts=$(python3 -c "import json; d=json.load(open('${_obs_snap}')); print(d.get('runtime_alerts','-'))" 2>/dev/null || echo "-")
+    _obs_gw=$(python3 -c "import json; d=json.load(open('${_obs_snap}')); print(d.get('gateway_warnings','-'))" 2>/dev/null || echo "-")
+    _obs_score=$(python3 -c "import json; d=json.load(open('${_obs_snap}')); print(d.get('reliability_score','-'))" 2>/dev/null || echo "-")
+    _obs_state=$(python3 -c "import json; d=json.load(open('${_obs_snap}')); print(d.get('protection_state','-'))" 2>/dev/null || echo "-")
+  elif [[ ! -f "${_obs_snap}" ]]; then
+    # Try to generate snapshot on-demand
+    python3 "${HOME}/.openclaw/watchdog/observe_aggregator.py" >/dev/null 2>&1 || true
+  fi
+
+  printf '\n'
+  if ui_enabled; then
+    printf '%s\n' "$(color_wrap '1;36' 'OpenClaw Observe')"
+  else
+    printf 'OpenClaw Observe\n'
+  fi
+  printf 'agents: %s\n'           "${_obs_agents}"
+  printf 'sessions: %s\n'         "${_obs_sessions}"
+  printf 'orphan sessions: %s\n'  "${_obs_orphans}"
+  printf 'runtime alerts: %s\n'   "${_obs_alerts}"
+  printf 'gateway warnings: %s\n' "${_obs_gw}"
+  printf 'reliability score: %s\n' "${_obs_score}"
+  if ui_enabled; then
+    case "${_obs_state}" in
+      ACTIVE)
+        printf 'protection state: %s\n' "$(color_wrap '1;32' "${_obs_state}")" ;;
+      DEGRADED)
+        printf 'protection state: %s\n' "$(color_wrap '1;33' "${_obs_state}")" ;;
+      AT_RISK)
+        printf 'protection state: %s\n' "$(color_wrap '1;31' "${_obs_state}")" ;;
+      *)
+        printf 'protection state: %s\n' "${_obs_state}" ;;
+    esac
+  else
+    printf 'protection state: %s\n' "${_obs_state}"
+  fi
 }
 
 print_help() {
@@ -836,6 +889,28 @@ EOF
 }
 
 main() {
+  # Fast-path: watch mode — hand off to Python immediately
+  local _interval=10
+  for _arg in "$@"; do
+    case "${_arg}" in
+      -watch|--watch)
+        local _watch_script="${SCRIPT_DIR}/../lib/watch_mode.py"
+        if [[ ! -f "${_watch_script}" ]]; then
+          printf 'watch mode unavailable: lib/watch_mode.py not found\n' >&2
+          return 1
+        fi
+        # Parse optional -interval flag from remaining args
+        for _a in "$@"; do
+          case "${_a}" in
+            -interval=*|--interval=*) _interval="${_a#*=}" ;;
+          esac
+        done
+        exec python3 "${_watch_script}" --interval "${_interval}"
+        return 0
+        ;;
+    esac
+  done
+
   while (($# > 0)); do
     case "${1-}" in
       --help|-help|-h)
