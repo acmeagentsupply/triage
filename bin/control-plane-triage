@@ -851,7 +851,7 @@ Host: $(hostname)
 User: $(id -un)
 EOF
 
-  printf 'Collecting evidence...\n'
+  [[ "${OCTU_SHARE_MODE:-0}" != "1" ]] && printf 'Collecting evidence...\n'
 
   for collector_file in "${COLLECTOR_DIR}"/*.sh; do
     [[ -f "${collector_file}" ]] || continue
@@ -883,12 +883,43 @@ EOF
     printf 'SHA256 manifest unavailable: shasum not found.\n' > "${bundle_dir}/manifest.sha256"
   fi
 
-  printf 'Proof bundle initialized at %s\n' "${bundle_dir}"
   source "${STATUS_REDUCER}"
-  octu_render_from_statuses "${bundle_dir}" "${bundle_dir}/collector_status.txt"
+  if [[ "${OCTU_SHARE_MODE:-0}" == "1" ]]; then
+    octu_render_share_snapshot "${bundle_dir}"
+  else
+    printf 'Proof bundle initialized at %s\n' "${bundle_dir}"
+    octu_render_from_statuses "${bundle_dir}" "${bundle_dir}/collector_status.txt"
+  fi
 }
 
 main() {
+  # Fast-path: share mode
+  local _share=0 _redact=0 _copy=0
+  for _arg in "$@"; do
+    case "${_arg}" in
+      -share|--share)   _share=1 ;;
+      -redact|--redact) _redact=1 ;;
+      -copy|--copy)     _copy=1 ;;
+    esac
+  done
+  if ((_share)); then
+    export OCTU_SHARE_MODE=1
+    export OCTU_SHARE_REDACT="${_redact}"
+    if ((_copy)) && command -v pbcopy >/dev/null 2>&1; then
+      local _snap
+      _snap="$(proof_bundle 2>/dev/null)"
+      printf '%s\n' "${_snap}"
+      printf '%s\n' "${_snap}" | pbcopy
+      printf '(copied to clipboard)\n' >&2
+    else
+      proof_bundle 2>/dev/null
+      if ((_copy)); then
+        printf '(pbcopy not available; output not copied)\n' >&2
+      fi
+    fi
+    return 0
+  fi
+
   # Fast-path: watch mode — hand off to Python immediately
   local _interval=10
   for _arg in "$@"; do

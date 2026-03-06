@@ -35,6 +35,99 @@ octu_compact_sha() {
   fi
 }
 
+# ── Share Mode Snapshot (octriage -share) ────────────────────────────────────
+
+octu_render_share_snapshot() {
+  local bundle_dir="$1"
+  local redact="${OCTU_SHARE_REDACT:-0}"
+
+  # ── Gather status signals ─────────────────────────────────────────────────
+  local gateway sessions digest disk lineage verify_status verify_installed_sha verify_expected_sha
+  gateway="$(gateway_summary "${bundle_dir}" 2>/dev/null || echo "UNKNOWN")"
+  sessions="$(sessions_summary "${bundle_dir}" 2>/dev/null || echo "UNKNOWN")"
+  lineage="$(lineage_summary "${bundle_dir}" 2>/dev/null || echo "")"
+  digest="$(digest_summary 2>/dev/null || echo "UNKNOWN")"
+  disk="$(disk_summary 2>/dev/null || echo "UNKNOWN")"
+
+  local raw_verify
+  raw_verify="$(verify_summary 2>/dev/null || echo "unknown|unknown|UNKNOWN")"
+  verify_installed_sha="${raw_verify%%|*}"
+  raw_verify="${raw_verify#*|}"
+  verify_expected_sha="${raw_verify%%|*}"
+  verify_status="${raw_verify##*|}"
+
+  local status_with_reason status status_token reason
+  status_with_reason="$(overall_status "${verify_status}" "${lineage}" "${gateway}" "${sessions}" "${digest}" "" "${disk}" 2>/dev/null || echo "SYSTEM HEALTHY|reason=none")"
+  status="${status_with_reason%%|*}"
+  reason="${status_with_reason#*|}"
+  case "${status}" in
+    "SYSTEM HEALTHY") status_token="HEALTHY" ;;
+    "DEGRADED")       status_token="DEGRADED" ;;
+    *)                status_token="FAILED" ;;
+  esac
+
+  # ── Strip to status token only for gateway/sessions/digest ───────────────
+  local gw_tok sess_tok dig_tok
+  gw_tok="${gateway%% *}"
+  sess_tok="${sessions%% *}"
+  dig_tok="${digest%% *}"
+
+  # ── Disk: keep status + percentage ───────────────────────────────────────
+  local disk_tok
+  disk_tok=$(printf '%s' "$disk" | python3 -c "
+import sys, re
+line = sys.stdin.read().strip()
+# e.g. 'WARN (83% used)' -> 'WARN (83%)'  or 'OK (34% used, 17Gi free)' -> 'OK (34%)'
+m = re.search(r'^(\S+).*?(\d+%)', line)
+if m:
+    print('%s (%s)' % (m.group(1), m.group(2)))
+else:
+    print(line.split()[0] if line else 'UNKNOWN')
+" 2>/dev/null || echo "${disk%% *}")
+
+  # ── Sprint 2 signals ─────────────────────────────────────────────────────
+  local activity compaction trend_raw trend_delta
+  activity="$(_octu_agent_activity 2>/dev/null | sed 's/^agent activity: //')"
+  compaction="$(_octu_compaction_status 2>/dev/null | sed 's/^compaction: //')"
+  trend_raw="$(_octu_reliability_trend 2>/dev/null)"
+  # Extract delta like "+28" or "-4" from "reliability trend (24h): 46 → 74 (+28)"
+  trend_delta=$(printf '%s' "$trend_raw" | grep -oE '[+-][0-9]+\)' | tr -d ')' || echo "unknown")
+  [[ -z "$trend_delta" ]] && trend_delta="unknown"
+
+  # ── Observe snapshot ─────────────────────────────────────────────────────
+  local obs_snap="${HOME}/.openclaw/workspace/reports/observe_snapshot.json"
+  local rel_score prot_state
+  rel_score="-"
+  prot_state="-"
+  if command -v python3 >/dev/null 2>&1 && [[ -f "${obs_snap}" ]]; then
+    python3 "${HOME}/.openclaw/watchdog/observe_aggregator.py" >/dev/null 2>&1 || true
+    rel_score=$(python3 -c "import json; d=json.load(open('${obs_snap}')); print(d.get('reliability_score','-'))" 2>/dev/null || echo "-")
+    prot_state=$(python3 -c "import json; d=json.load(open('${obs_snap}')); print(d.get('protection_state','-'))" 2>/dev/null || echo "-")
+  fi
+
+  # ── Bundle path ──────────────────────────────────────────────────────────
+  local bundle_path="${bundle_dir}"
+  if [[ "${redact}" == "1" ]]; then
+    bundle_path=$(printf '%s' "${bundle_path}" | sed "s|/Users/[^/]*/|/Users/.../|g")
+  fi
+
+  # ── Render ───────────────────────────────────────────────────────────────
+  printf 'OpenClaw Incident Snapshot\n'
+  printf 'status: %s\n'        "${status_token}"
+  printf 'gateway: %s\n'       "${gw_tok}"
+  printf 'sessions: %s\n'      "${sess_tok}"
+  printf 'digest: %s\n'        "${dig_tok}"
+  printf 'disk: %s\n'          "${disk_tok}"
+  printf 'agent activity: %s\n' "${activity:-unknown}"
+  printf 'reliability: %s\n'   "${rel_score}"
+  printf 'trend_24h: %s\n'     "${trend_delta}"
+  printf 'protection: %s\n'    "${prot_state}"
+  printf 'compaction: %s\n'    "${compaction:-unknown}"
+  printf 'bundle: %s\n'        "${bundle_path}"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 # ── Sprint 2 helpers ──────────────────────────────────────────────────────────
 
 # Task 4: Fleet Identity
