@@ -1,10 +1,10 @@
-# OCTriageUnit
+# triage
 
 ![Control Plane Trusted](docs/assets/control-plane-trusted.svg) ![Read-Only Verified](docs/assets/read-only-verified.svg)
 
-OCTriageUnit is a read-only control-plane triage tool for OpenClaw environments.
+`triage` is a read-only control-plane diagnostic tool for OpenClaw environments.
 
-It gives you a fast, deterministic snapshot of gateway health, builder state, and core diagnostics — and packages the evidence into a timestamped proof bundle.
+It gives you a fast, deterministic snapshot of gateway health, session state, and core diagnostics — and packages the evidence into a timestamped proof bundle.
 
 **Works even when your OpenClaw environment is already degraded.**
 
@@ -21,65 +21,55 @@ curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh
 Then run:
 
 ```bash
-octriageunit --self-test && octriageunit
+triage --self-test && triage
 ```
 
-![OCTriageUnit install and first run](docs/images/triage-hero.png)
+![triage install and first run](docs/images/triage-hero.png)
 
 The bundle is written to `~/octriage-bundles/<timestamp>/` with real evidence files ready for review or support escalation.
 
 ---
 
-## Health Verification
+## What It Checks
 
-As of v0.1.5, OCTriageUnit evaluates health in this order:
+As of v0.1.5, triage evaluates five core signals:
 
-- `gateway`: fast local liveness probe first, then healthcheck artifacts, then gateway error context
-- `builder`: loaded `launchctl` job with a healthy schedule reports `SCHEDULED`; missing label reports `STOPPED`
-- `verify`: compares the installed CLI SHA against an authoritative expected SHA when one is available
+| Signal | What it checks |
+|--------|---------------|
+| `gateway` | Local liveness probe, healthcheck artifacts, error log context |
+| `sessions` | Agent count, session topology, orphan detection |
+| `disk` | Available disk space on the home volume |
+| `verify` | Installed CLI SHA vs. recorded release checksum |
+| `doctor` | Output of `openclaw doctor` (25s timeout) |
 
-When the gateway is healthy, the local runtime normally presents three signals:
+Additional signals when available:
+- `agent activity` — recent event rate across the agent fleet
+- `compaction` — context compaction state from the watchdog log
+- `fleet` — hostname and uptime identity
 
-![Gateway health verification](docs/images/health-verification.png)
+### Health Verification
+
+When the gateway is healthy, triage reports three signals:
 
 ```
-Runtime: running (pid <N>)
-RPC probe: ok
-Listening: 127.0.0.1:18789
+gateway: OK (liveness)
+sessions: NORMAL (agents=N ...)
+STATUS: [HEALTHY]
 ```
-
-If any are missing, run `octriageunit` immediately to capture a proof bundle before attempting any restart.
 
 ### Verify Behavior
-
-The summary includes a verification line:
 
 ```text
 verify: installed_sha=<sha> expected_sha=<sha> MATCH
 ```
 
-Rules:
-
-- `MATCH`: the installed CLI matches the recorded release checksum
-- `MISMATCH`: the installed CLI differs from a known expected checksum; this degrades status
-- `UNKNOWN`: no authoritative expected checksum was available, so OCTriageUnit reports the uncertainty without forcing a mismatch
-
-The installer records the installed checksum alongside the binary as `octriageunit.sha256`, and the verifier prefers that record when present.
-
-### Builder Classification
-
-The digest builder is classified conservatively:
-
-- `SCHEDULED`: launchd label is loaded and the scheduled job is healthy, even if it is idle between runs
-- `DEGRADED`: label is loaded but last exit or recent builder errors indicate trouble
-- `STALE`: label is loaded but digest freshness exceeds the expected interval
-- `STOPPED`: launchd label is not loaded
+- `MATCH` — installed CLI matches the release checksum
+- `MISMATCH` — CLI has been modified since install; status is degraded
+- `UNKNOWN` — no authoritative checksum available
 
 ---
 
 ## What Gets Collected
-
-As of v0.1.5, all collection is real — no placeholder stubs.
 
 | File | Source |
 |------|--------|
@@ -91,8 +81,7 @@ As of v0.1.5, all collection is real — no placeholder stubs.
 | `launchctl_gateway.txt` | `launchctl print` for gateway service |
 | `launchctl_watchdog.txt` | `launchctl print` for watchdog service |
 | `gateway_health.txt/json` | Copied from healthcheck agent output |
-| `gateway_probe_meta.txt` | Local probe auth state used during gateway classification |
-| `verify_integrity.txt` | Installed CLI SHA, expected SHA, and verify state |
+| `verify_integrity.txt` | Installed SHA, expected SHA, verify state |
 | `manifest.sha256` | SHA-256 checksums of all artifacts |
 
 ---
@@ -113,7 +102,7 @@ As of v0.1.5, all collection is real — no placeholder stubs.
 
 ## Installation Options
 
-For a user-only install (no sudo):
+User-only install (no sudo):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash -s -- --user
@@ -135,8 +124,8 @@ curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/scripts/un
 
 | Item | Path |
 |---|---|
-| CLI binary | `/usr/local/bin/octriageunit` (system) or `~/.local/bin/octriageunit` (user) |
-| App bundle | `~/Applications/OCTriageUnit.app` (optional, release zip only) |
+| CLI binary | `/usr/local/bin/triage` (system) or `~/.local/bin/triage` (user) |
+| App bundle | `~/Applications/triage.app` (optional, release zip only) |
 | Proof bundles | `~/octriage-bundles/<timestamp>/` |
 
 ---
@@ -156,14 +145,22 @@ Review bundle format: [docs/proof-bundle-format.md](docs/proof-bundle-format.md)
 
 ## Threat Model
 
-OCTriageUnit reads local process and platform state through operator-invoked system tools, then writes artifacts into a local proof bundle. It cannot repair services, rotate credentials, or validate remote state. The trust boundary is the local host.
+`triage` reads local process and platform state through operator-invoked system tools, then writes artifacts into a local proof bundle. It cannot repair services, rotate credentials, or validate remote state. The trust boundary is the local host.
+
+---
+
+## Advanced Features
+
+Live monitoring, reliability scoring, protection state, and RadCheck history integration are available in **Triage for Acme** — the commercial edition for teams running the full Acme Agent Supply stack.
+
+→ [acmeagentsupply.com](https://acmeagentsupply.com)
 
 ---
 
 ## Operator Notes
 
 - Read-only by design — never touches anything outside `~/octriage-bundles/`
-- Timed out commands are captured as evidence; the tool never stalls your recovery workflow
+- Timed-out commands are captured as evidence; the tool never stalls your recovery workflow
 - Treat bundles as sensitive — redact before sharing externally
 
 ---
