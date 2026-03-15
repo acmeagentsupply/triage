@@ -1,3 +1,4 @@
 dist/
 Applications/
 *.DS_Store
+.codex_task.md
