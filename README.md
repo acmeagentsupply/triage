@@ -32,7 +32,7 @@ The bundle is written to `~/octriage-bundles/<timestamp>/` with real evidence fi
 
 ## What It Checks
 
-As of v0.1.5, triage evaluates five core signals:
+As of v0.1.6, triage evaluates five core signals:
 
 | Signal | What it checks |
 |--------|---------------|
