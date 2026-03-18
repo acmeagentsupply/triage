@@ -47,6 +47,8 @@ It's also read-only. There's no risk to running it in a degraded production envi
 
 ## What It Checks
 
+As of v0.1.6, triage evaluates these signals:
+
 | Signal | What it checks |
 |--------|---------------|
 | `gateway` | Local liveness probe, healthcheck artifacts, error log context |
@@ -115,8 +117,6 @@ Every run writes a timestamped bundle to `~/octriage-bundles/`:
 | `MISMATCH` | Binary has been modified since install. Reinstall before trusting output. |
 | `UNKNOWN` | No authoritative checksum available. |
 
-The installer records the installed checksum alongside the binary. `verify` prefers that record when present.
-
 ---
 
 ## Safety Guarantees
@@ -127,7 +127,7 @@ The installer records the installed checksum alongside the binary. `verify` pref
 
 **Local-only:** All execution on the operator machine.
 
-**Auditable:** `cat /usr/local/bin/triage` (or `~/.local/bin/triage`) shows the full script. No compiled binary, no hidden behavior.
+**Auditable:** `cat $(which triage)` shows the full script. No compiled binary, no hidden behavior.
 
 **Proof bundle:** Writes only to `~/octriage-bundles/`. Nothing else.
 

@@ -86,24 +86,9 @@ else:
 " 2>/dev/null || echo "${disk%% *}")
 
   # ── Sprint 2 signals ─────────────────────────────────────────────────────
-  local activity compaction trend_raw trend_delta
+  local activity compaction
   activity="$(_octu_agent_activity 2>/dev/null | sed 's/^agent activity: //')"
   compaction="$(_octu_compaction_status 2>/dev/null | sed 's/^compaction: //')"
-  trend_raw="$(_octu_reliability_trend 2>/dev/null)"
-  # Extract delta like "+28" or "-4" from "reliability trend (24h): 46 → 74 (+28)"
-  trend_delta=$(printf '%s' "$trend_raw" | grep -oE '[+-][0-9]+\)' | tr -d ')' || echo "unknown")
-  [[ -z "$trend_delta" ]] && trend_delta="unknown"
-
-  # ── Observe snapshot ─────────────────────────────────────────────────────
-  local obs_snap="${HOME}/.openclaw/workspace/reports/observe_snapshot.json"
-  local rel_score prot_state
-  rel_score="-"
-  prot_state="-"
-  if command -v python3 >/dev/null 2>&1 && [[ -f "${obs_snap}" ]]; then
-    python3 "${HOME}/.openclaw/watchdog/observe_aggregator.py" >/dev/null 2>&1 || true
-    rel_score=$(python3 -c "import json; d=json.load(open('${obs_snap}')); print(d.get('reliability_score','-'))" 2>/dev/null || echo "-")
-    prot_state=$(python3 -c "import json; d=json.load(open('${obs_snap}')); print(d.get('protection_state','-'))" 2>/dev/null || echo "-")
-  fi
 
   # ── Bundle path ──────────────────────────────────────────────────────────
   local bundle_path="${bundle_dir}"
@@ -119,9 +104,6 @@ else:
   printf 'digest: %s\n'        "${dig_tok}"
   printf 'disk: %s\n'          "${disk_tok}"
   printf 'agent activity: %s\n' "${activity:-unknown}"
-  printf 'reliability: %s\n'   "${rel_score}"
-  printf 'trend_24h: %s\n'     "${trend_delta}"
-  printf 'protection: %s\n'    "${prot_state}"
   printf 'compaction: %s\n'    "${compaction:-unknown}"
   printf 'bundle: %s\n'        "${bundle_path}"
   local _ver
@@ -242,95 +224,7 @@ except Exception:
   printf 'compaction: UNKNOWN\n'
 }
 
-# Task 3: Reliability Trend (24h)
-_octu_reliability_trend() {
-  local history="${HOME}/.openclaw/watchdog/radcheck_history.ndjson"
-  if [[ ! -f "$history" ]]; then
-    printf 'reliability trend (24h): insufficient history\n'
-    return
-  fi
-  python3 -c "
-import json
-from datetime import datetime, timezone, timedelta
-entries = []
-try:
-    with open('$history') as f:
-        for line in f:
-            line = line.strip()
-            if not line: continue
-            try:
-                d = json.loads(line)
-                ts = d.get('ts', '')
-                score = d.get('score')
-                if ts and score is not None:
-                    t = datetime.fromisoformat(ts.replace('Z', '+00:00'))
-                    entries.append((t, int(score)))
-            except Exception:
-                pass
-except Exception:
-    pass
-if len(entries) < 2:
-    print('reliability trend (24h): insufficient history')
-else:
-    now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(hours=24)
-    cur_score = entries[-1][1]
-    past = [(abs((t - cutoff).total_seconds()), s) for t, s in entries if t <= cutoff]
-    if not past:
-        old_score = entries[0][1]
-    else:
-        past.sort()
-        old_score = past[0][1]
-    delta = cur_score - old_score
-    sign = '+' if delta >= 0 else ''
-    print('reliability trend (24h): %d -> %d (%s%d)' % (old_score, cur_score, sign, delta))
-" 2>/dev/null || printf 'reliability trend (24h): insufficient history\n'
-}
 
-# Task 2: Protection Summary
-_octu_protection_summary() {
-  local prot="${HOME}/.openclaw/workspace/reports/protection_report.json"
-  local ops_log="${HOME}/.openclaw/watchdog/ops_events.log"
-  printf '\n'
-  if command -v color_wrap >/dev/null 2>&1 && ui_enabled 2>/dev/null; then
-    printf '%s\n' "$(color_wrap '1;36' 'Protection Summary (24h)')"
-  else
-    printf 'Protection Summary (24h)\n'
-  fi
-  python3 -c "
-import json, time
-from datetime import datetime
-ops_log = '$ops_log'
-events_24h = 0
-try:
-    cutoff = time.time() - 86400
-    with open(ops_log) as f:
-        for line in f:
-            line = line.strip()
-            if not line: continue
-            try:
-                d = json.loads(line)
-                ts = d.get('ts') or d.get('timestamp') or ''
-                if ts:
-                    t = datetime.fromisoformat(ts.replace('Z', '+00:00'))
-                    if t.timestamp() >= cutoff:
-                        events_24h += 1
-            except Exception:
-                pass
-except Exception:
-    pass
-prot = {}
-try:
-    prot = json.load(open('$prot'))
-except Exception:
-    pass
-rv = prot.get('recoveries_verified_24h', 'unknown')
-rs = prot.get('recovery_simulations_24h', 'unknown')
-print('events detected:    %s' % events_24h)
-print('recoveries verified: %s' % rv)
-print('recovery simulations: %s' % rs)
-" 2>/dev/null || printf 'events detected:    unknown\nrecoveries verified: unknown\nrecovery simulations: unknown\n'
-}
 
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -471,52 +365,5 @@ octu_render_from_statuses() {
       fi
       ;;
   esac
-  # Observe panel always appended after status
-  _octu_render_observe 2>/dev/null || true
 }
 
-# ── OpenClaw Observe section ─────────────────────────────────────────────────
-# Called at end of octu_render_from_statuses to append Observe panel.
-_octu_render_observe() {
-  local snap="${HOME}/.openclaw/workspace/reports/observe_snapshot.json"
-  local agents="-" sessions="-" orphans="-" alerts="-" gw="-" score="-" state="-"
-
-  if command -v python3 >/dev/null 2>&1; then
-    # Refresh snapshot (fast, exits 0)
-    python3 "${HOME}/.openclaw/watchdog/observe_aggregator.py" >/dev/null 2>&1 || true
-    if [[ -f "$snap" ]]; then
-      agents=$(python3   -c "import json; d=json.load(open('$snap')); print(d.get('agents','-'))"           2>/dev/null || echo "-")
-      sessions=$(python3 -c "import json; d=json.load(open('$snap')); print(d.get('sessions','-'))"         2>/dev/null || echo "-")
-      orphans=$(python3  -c "import json; d=json.load(open('$snap')); print(d.get('orphan_sessions','-'))"  2>/dev/null || echo "-")
-      alerts=$(python3   -c "import json; d=json.load(open('$snap')); print(d.get('runtime_alerts','-'))"   2>/dev/null || echo "-")
-      gw=$(python3       -c "import json; d=json.load(open('$snap')); print(d.get('gateway_warnings','-'))" 2>/dev/null || echo "-")
-      score=$(python3    -c "import json; d=json.load(open('$snap')); print(d.get('reliability_score','-'))" 2>/dev/null || echo "-")
-      state=$(python3    -c "import json; d=json.load(open('$snap')); print(d.get('protection_state','-'))" 2>/dev/null || echo "-")
-    fi
-  fi
-
-  printf '\n'
-  if command -v color_wrap >/dev/null 2>&1 && ui_enabled 2>/dev/null; then
-    printf '%s\n' "$(color_wrap '1;36' 'OpenClaw Observe')"
-  else
-    printf 'OpenClaw Observe\n'
-  fi
-  printf 'agents: %s\n'            "$agents"
-  printf 'sessions: %s\n'          "$sessions"
-  printf 'orphan sessions: %s\n'   "$orphans"
-  printf 'runtime alerts: %s\n'    "$alerts"
-  printf 'gateway warnings: %s\n'  "$gw"
-  printf 'reliability score: %s\n' "$score"
-  _octu_reliability_trend 2>/dev/null || true
-  if command -v color_wrap >/dev/null 2>&1 && ui_enabled 2>/dev/null; then
-    case "$state" in
-      ACTIVE)   printf 'protection state: %s\n' "$(color_wrap '1;32' "$state")" ;;
-      DEGRADED) printf 'protection state: %s\n' "$(color_wrap '1;33' "$state")" ;;
-      AT_RISK)  printf 'protection state: %s\n' "$(color_wrap '1;31' "$state")" ;;
-      *)        printf 'protection state: %s\n' "$state" ;;
-    esac
-  else
-    printf 'protection state: %s\n' "$state"
-  fi
-  _octu_protection_summary 2>/dev/null || true
-}

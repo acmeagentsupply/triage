@@ -34,10 +34,10 @@ collector_run() {
   fi
 
   if run_timeout "${COLLECT_TIMEOUT}" bash -lc '
-    if launchctl print "gui/'"$(id -u)"'/ai.openclaw.hendrik_watchdog" >/dev/null 2>&1; then
-      launchctl print "gui/'"$(id -u)"'/ai.openclaw.hendrik_watchdog"
+    if launchctl print "gui/'"$(id -u)"'/ai.openclaw.watchdog" >/dev/null 2>&1; then
+      launchctl print "gui/'"$(id -u)"'/ai.openclaw.watchdog"
     else
-      printf "Service not registered: ai.openclaw.hendrik_watchdog\n"
+      printf "Service not registered: ai.openclaw.watchdog\n"
     fi
   ' > "${bundle_dir}/launchctl_watchdog.txt" 2>&1; then :; else
     printf 'timeout\n' > "${bundle_dir}/launchctl_watchdog.txt"

@@ -920,23 +920,13 @@ main() {
     return 0
   fi
 
-  # Fast-path: watch mode — hand off to Python immediately
+  # Fast-path: watch mode — available in Acme commercial edition
   local _interval=10
   for _arg in "$@"; do
     case "${_arg}" in
       -watch|--watch)
-        local _watch_script="${SCRIPT_DIR}/../lib/watch_mode.py"
-        if [[ ! -f "${_watch_script}" ]]; then
-          printf 'watch mode unavailable: lib/watch_mode.py not found\n' >&2
-          return 1
-        fi
-        # Parse optional -interval flag from remaining args
-        for _a in "$@"; do
-          case "${_a}" in
-            -interval=*|--interval=*) _interval="${_a#*=}" ;;
-          esac
-        done
-        exec python3 "${_watch_script}" --interval "${_interval}"
+        printf 'Live watch mode is available in Triage for Acme — https://acmeagentsupply.com\n' >&2
+        return 1
         return 0
         ;;
     esac
