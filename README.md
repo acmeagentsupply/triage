@@ -1,99 +1,121 @@
-# OCTriageUnit
+# triage
 
 ![Control Plane Trusted](docs/assets/control-plane-trusted.svg) ![Read-Only Verified](docs/assets/read-only-verified.svg)
 
-OCTriageUnit is a read-only control-plane triage tool for OpenClaw environments.
+`triage` is a read-only control-plane diagnostic tool for OpenClaw environments.
 
-It gives you a fast, deterministic snapshot of gateway health, builder state, and core diagnostics — and packages the evidence into a timestamped proof bundle.
+When your gateway is degraded, `openclaw doctor` can't answer — it's asking the patient to diagnose itself. `triage` runs outside the gateway, reads directly from the filesystem and system tools, and tells you what's actually wrong.
 
-**Works even when your OpenClaw environment is already degraded.**
+**Works when OpenClaw doesn't.**
 
 No telemetry. No mutation. No background services.
 
 ---
 
-## Install + First Run
+## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash
 ```
 
-Then run:
+First run:
 
 ```bash
-octriageunit --self-test && octriageunit
+triage --self-test && triage
 ```
 
-![OCTriageUnit install and first run](docs/images/triage-hero.png)
+![triage install and first run](docs/images/triage-hero.png)
 
-The bundle is written to `~/octriage-bundles/<timestamp>/` with real evidence files ready for review or support escalation.
+The proof bundle is written to `~/octriage-bundles/<timestamp>/` — real evidence files ready for review, support escalation, or pasting into an AI assistant.
 
 ---
 
-## Health Verification
+## Why triage, not `openclaw doctor`?
 
-As of v0.1.5, OCTriageUnit evaluates health in this order:
+`openclaw doctor` checks health through the gateway. If the gateway is the problem, you get nothing useful.
 
-- `gateway`: fast local liveness probe first, then healthcheck artifacts, then gateway error context
-- `builder`: loaded `launchctl` job with a healthy schedule reports `SCHEDULED`; missing label reports `STOPPED`
-- `verify`: compares the installed CLI SHA against an authoritative expected SHA when one is available
-
-When the gateway is healthy, the local runtime normally presents three signals:
-
-![Gateway health verification](docs/images/health-verification.png)
+`triage` is an external observer. It reads logs, sessions, and system state directly — no gateway required. That's the entire differentiator:
 
 ```
-Runtime: running (pid <N>)
-RPC probe: ok
-Listening: 127.0.0.1:18789
+openclaw doctor  →  gateway checks itself   (useless when gateway is the problem)
+triage           →  external observer        (works regardless of gateway state)
 ```
 
-If any are missing, run `octriageunit` immediately to capture a proof bundle before attempting any restart.
-
-### Verify Behavior
-
-The summary includes a verification line:
-
-```text
-verify: installed_sha=<sha> expected_sha=<sha> MATCH
-```
-
-Rules:
-
-- `MATCH`: the installed CLI matches the recorded release checksum
-- `MISMATCH`: the installed CLI differs from a known expected checksum; this degrades status
-- `UNKNOWN`: no authoritative expected checksum was available, so OCTriageUnit reports the uncertainty without forcing a mismatch
-
-The installer records the installed checksum alongside the binary as `octriageunit.sha256`, and the verifier prefers that record when present.
-
-### Builder Classification
-
-The digest builder is classified conservatively:
-
-- `SCHEDULED`: launchd label is loaded and the scheduled job is healthy, even if it is idle between runs
-- `DEGRADED`: label is loaded but last exit or recent builder errors indicate trouble
-- `STALE`: label is loaded but digest freshness exceeds the expected interval
-- `STOPPED`: launchd label is not loaded
+It's also read-only. There's no risk to running it in a degraded production environment.
 
 ---
 
-## What Gets Collected
+## What It Checks
 
-As of v0.1.5, all collection is real — no placeholder stubs.
+| Signal | What it checks |
+|--------|---------------|
+| `gateway` | Local liveness probe, healthcheck artifacts, error log context |
+| `sessions` | Agent count, session topology, orphan detection |
+| `disk` | Available disk space on the home volume |
+| `verify` | Installed CLI SHA vs. recorded release checksum |
+| `doctor` | Output of `openclaw doctor` (25s timeout) |
+| `compaction` | Context compaction state from the watchdog log |
+| `activity` | Recent event rate across the agent fleet |
+| `fleet` | Hostname and uptime identity |
 
-| File | Source |
-|------|--------|
+---
+
+## Reading the Output
+
+A healthy system:
+
+```
+gateway: OK (liveness)
+sessions: NORMAL (agents=2 ...)
+verify: MATCH
+STATUS: [HEALTHY]
+```
+
+A degraded system:
+
+```
+gateway: DEGRADED (no healthcheck artifact)
+sessions: ORPHAN_DETECTED (agents=3, orphans=1)
+disk: WARNING (available=2.1GB)
+STATUS: [AT_RISK]
+```
+
+`AT_RISK` means something is degrading but the system is still running. `CRITICAL` means act now.
+
+The value of `AT_RISK`: triage catches risk *before* failure, not just after. Run it regularly, not just when something breaks.
+
+---
+
+## The Proof Bundle
+
+Every run writes a timestamped bundle to `~/octriage-bundles/`:
+
+| File | Contents |
+|------|----------|
 | `bundle_summary.txt` | Version, timestamp, hostname |
-| `doctor_output.txt` | `openclaw doctor` (25s timeout) |
+| `doctor_output.txt` | `openclaw doctor` output (25s timeout) |
 | `gateway_err_tail.txt` | Filtered tail of `gateway.err.log` |
 | `gateway_log_tail.txt` | Last 120 lines of `gateway.log` |
 | `openclaw_status.txt` | `openclaw status` + `gateway status --deep` |
 | `launchctl_gateway.txt` | `launchctl print` for gateway service |
 | `launchctl_watchdog.txt` | `launchctl print` for watchdog service |
 | `gateway_health.txt/json` | Copied from healthcheck agent output |
-| `gateway_probe_meta.txt` | Local probe auth state used during gateway classification |
-| `verify_integrity.txt` | Installed CLI SHA, expected SHA, and verify state |
-| `manifest.sha256` | SHA-256 checksums of all artifacts |
+| `verify_integrity.txt` | Installed SHA, expected SHA, verify state |
+| `manifest.sha256` | SHA-256 checksums of all bundle artifacts |
+
+**Using the bundle:** Paste contents into a support ticket, or send to an AI assistant with "here's my triage bundle, what's wrong?" The bundle format is designed for both.
+
+---
+
+## verify States
+
+| State | Meaning |
+|-------|---------|
+| `MATCH` | Binary matches the release checksum. Trust it. |
+| `MISMATCH` | Binary has been modified since install. Reinstall before trusting output. |
+| `UNKNOWN` | No authoritative checksum available. |
+
+The installer records the installed checksum alongside the binary. `verify` prefers that record when present.
 
 ---
 
@@ -105,69 +127,93 @@ As of v0.1.5, all collection is real — no placeholder stubs.
 
 **Local-only:** All execution on the operator machine.
 
-**Proof bundle:** Writes only to `~/octriage-bundles/`.
+**Auditable:** `cat /usr/local/bin/triage` (or `~/.local/bin/triage`) shows the full script. No compiled binary, no hidden behavior.
 
-**Auditable:** `cat bin/control-plane-triage` shows the full script.
+**Proof bundle:** Writes only to `~/octriage-bundles/`. Nothing else.
 
 ---
 
 ## Installation Options
 
-For a user-only install (no sudo):
+**System install (recommended):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash
+```
 
+**User-only (no sudo required):**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash -s -- --user
 ```
 
-Verify install matches source:
-
+**Verify install matches source:**
 ```bash
 bash scripts/install.sh --verify-from-source
 ```
 
-Uninstall:
-
+**Uninstall:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/scripts/uninstall.sh | bash
 ```
 
+---
+
 ## Where Files Are Installed
 
 | Item | Path |
-|---|---|
-| CLI binary | `/usr/local/bin/octriageunit` (system) or `~/.local/bin/octriageunit` (user) |
-| App bundle | `~/Applications/OCTriageUnit.app` (optional, release zip only) |
+|------|------|
+| CLI binary | `/usr/local/bin/triage` (system) or `~/.local/bin/triage` (user) |
 | Proof bundles | `~/octriage-bundles/<timestamp>/` |
 
 ---
 
-## How To Verify
+## Verify Manually
 
 ```bash
-shasum -a 256 bin/control-plane-triage
-bash -n bin/control-plane-triage
+shasum -a 256 $(which triage)
+bash -n $(which triage)
 ```
 
-Review full trust posture: [docs/trust-doctrine.md](docs/trust-doctrine.md)
+Full trust posture: [docs/trust-doctrine.md](docs/trust-doctrine.md)
 
-Review bundle format: [docs/proof-bundle-format.md](docs/proof-bundle-format.md)
+Bundle format spec: [docs/proof-bundle-format.md](docs/proof-bundle-format.md)
+
+Quick reference: [CHEATSHEET.md](CHEATSHEET.md)
 
 ---
 
 ## Threat Model
 
-OCTriageUnit reads local process and platform state through operator-invoked system tools, then writes artifacts into a local proof bundle. It cannot repair services, rotate credentials, or validate remote state. The trust boundary is the local host.
+`triage` reads local process and platform state through operator-invoked system tools, then writes artifacts into a local proof bundle. It cannot repair services, rotate credentials, or validate remote state. The trust boundary is the local host.
 
 ---
 
-## Operator Notes
+## Something Broken?
 
-- Read-only by design — never touches anything outside `~/octriage-bundles/`
-- Timed out commands are captured as evidence; the tool never stalls your recovery workflow
-- Treat bundles as sensitive — redact before sharing externally
+1. `triage --self-test` — verify the tool is healthy before trusting its output
+2. `triage` — capture the proof bundle
+3. `ls ~/octriage-bundles/` — find the latest bundle
+4. Send `bundle_summary.txt` + `gateway_err_tail.txt` to support or an AI assistant
+
+→ support@acmeagentsupply.com
+
+---
+
+## Want More?
+
+Live monitoring (`-watch` mode), reliability scoring, protection state, and RadCheck history integration are available in **Triage for Acme** — the commercial edition for teams running the full Acme reliability stack.
+
+→ [acmeagentsupply.com](https://acmeagentsupply.com)
 
 ---
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+---
+
+## Contributing
+
+Open source under MIT. Issues and PRs welcome.
+
+This repo is the OSS core. The commercial edition (`-watch`, Observe panel, RadCheck trend) lives at [acmeagentsupply.com](https://acmeagentsupply.com).
