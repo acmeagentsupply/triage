@@ -2,19 +2,19 @@
 
 ## Threat Model
 
-OCTriageUnit is a local bash-based triage entrypoint. In its current form, it reads only enough local state to:
+triage is a local bash-based triage entrypoint. In its current form, it reads only enough local state to:
 
 - confirm that required binaries such as `launchctl` and `openclaw` are present in the operator environment
-- create a timestamped proof bundle directory under `~/octriage-bundles/`
+- create a timestamped proof bundle directory under `~/triage-bundles/`
 - print safety and usage information for the operator
 
 When diagnostic collection steps are implemented, they must remain consistent with the trust doctrine:
 
 - read local command output and local logs needed for triage
-- write evidence files only inside `~/octriage-bundles/`
+- write evidence files only inside `~/triage-bundles/`
 - avoid service restarts, config edits, credential mutation, and network writes
 
-OCTriageUnit never intentionally:
+triage never intentionally:
 
 - edits files outside the proof bundle directory
 - changes service state with `launchctl`
@@ -22,7 +22,7 @@ OCTriageUnit never intentionally:
 - mutates OpenClaw configuration or control plane resources
 - hides collection logic from the operator
 
-Because this is a bash script, its real security boundary is the local machine and the local executables it invokes. If the host, shell, PATH resolution, or installed `openclaw` binary is already compromised, OCTriageUnit cannot provide stronger guarantees than those components.
+Because this is a bash script, its real security boundary is the local machine and the local executables it invokes. If the host, shell, PATH resolution, or installed `openclaw` binary is already compromised, triage cannot provide stronger guarantees than those components.
 
 ## Responsible Disclosure
 
@@ -58,7 +58,7 @@ If you distribute release artifacts, publish the expected SHA256 alongside the t
 
 ## Hidden Outbound Calls
 
-Any hidden outbound call is a security bug. OCTriageUnit is expected to make zero outbound network requests.
+Any hidden outbound call is a security bug. triage is expected to make zero outbound network requests.
 
 If you find one:
 
