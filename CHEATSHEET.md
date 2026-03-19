@@ -64,7 +64,7 @@ STATUS: [CRITICAL]   ← act now
 
 ## The Proof Bundle
 
-Every run writes to `~/octriage-bundles/<timestamp>/`:
+Every run writes to `~/triage-bundles/<timestamp>/`:
 
 | File | What's in it |
 |------|-------------|
@@ -101,7 +101,7 @@ curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/scripts
 ## Safety Guarantees (one-liner version)
 
 **Read-only. Local-only. No telemetry. Never modifies anything.**
-Only writes to `~/octriage-bundles/`.
+Only writes to `~/triage-bundles/`.
 
 ---
 
@@ -109,7 +109,7 @@ Only writes to `~/octriage-bundles/`.
 
 1. Run `triage --self-test` first — confirms the tool itself is healthy
 2. Run `triage` — captures the proof bundle
-3. Open the bundle: `ls ~/octriage-bundles/` → find the latest timestamp
+3. Open the bundle: `ls ~/triage-bundles/` → find the latest timestamp
 4. Paste `bundle_summary.txt` + `gateway_err_tail.txt` into support or an AI assistant
 
 ---
