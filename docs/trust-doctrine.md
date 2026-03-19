@@ -1,12 +1,12 @@
-# OCTriageUnit Trust Doctrine
+# triage Trust Doctrine
 
-OCTriageUnit exists to help operators investigate OpenClaw control plane issues without creating new risk while they troubleshoot. The tool is intentionally conservative: it should prefer incomplete evidence over unsafe behavior, and it should always leave a trail of local artifacts that another operator can inspect.
+triage exists to help operators investigate OpenClaw control plane issues without creating new risk while they troubleshoot. The tool is intentionally conservative: it should prefer incomplete evidence over unsafe behavior, and it should always leave a trail of local artifacts that another operator can inspect.
 
 ## The Six Principles
 
 ### 1. Read-Only By Default
 
-OCTriageUnit must not modify configuration, restart services, reload daemons, rotate credentials, or make durable state changes as part of normal operation. Diagnostic collection is read-only. The only files it may create are proof bundle artifacts under `~/octriage-bundles/`.
+triage must not modify configuration, restart services, reload daemons, rotate credentials, or make durable state changes as part of normal operation. Diagnostic collection is read-only. The only files it may create are proof bundle artifacts under `~/triage-bundles/`.
 
 ### 2. No Security Through Obscurity
 
@@ -18,7 +18,7 @@ The build must be reproducible from the public source tree, with a clear depende
 
 ### 4. Latent Feature Discipline
 
-Future hooks are acceptable only when they are inert by default and activated explicitly by the operator. OCTriageUnit should never ship with dormant behavior that starts running automatically later because an environment variable, remote flag, or packaging change turned it on.
+Future hooks are acceptable only when they are inert by default and activated explicitly by the operator. triage should never ship with dormant behavior that starts running automatically later because an environment variable, remote flag, or packaging change turned it on.
 
 ### 5. Proof-Bundle Culture
 
@@ -33,7 +33,7 @@ The tool should be fast, deterministic, non-blocking, and safe on degraded syste
 Before publishing a release, verify all of the following:
 
 - the script still performs no config mutation, service restarts, or network writes
-- proof bundle output is confined to `~/octriage-bundles/`
+- proof bundle output is confined to `~/triage-bundles/`
 - `--help` states the safety guarantees clearly
 - the source tree and released artifact produce matching SHA256 values
 - dependency expectations are documented and reviewable
@@ -43,4 +43,4 @@ Before publishing a release, verify all of the following:
 
 ## Strategic Funnel Note
 
-OCTriageUnit should earn trust in the narrowest, most auditable scope first: local, read-only, evidence-producing diagnostics. If future releases add collection breadth or optional integrations, that expansion must preserve the same trust posture. New capability is acceptable only when it remains source-visible, operator-activated, and easy to verify from the artifact trail it leaves behind.
+triage should earn trust in the narrowest, most auditable scope first: local, read-only, evidence-producing diagnostics. If future releases add collection breadth or optional integrations, that expansion must preserve the same trust posture. New capability is acceptable only when it remains source-visible, operator-activated, and easy to verify from the artifact trail it leaves behind.
