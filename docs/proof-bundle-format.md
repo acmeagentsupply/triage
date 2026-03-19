@@ -1,6 +1,6 @@
 # Proof Bundle Format
 
-OCTriageUnit writes proof bundles under `~/octriage-bundles/<timestamp>/`. Each bundle should be self-contained, easy to archive, and usable by another operator without needing access to the original terminal session.
+triage writes proof bundles under `~/triage-bundles/<timestamp>/`. Each bundle should be self-contained, easy to archive, and usable by another operator without needing access to the original terminal session.
 
 ## Standard Files
 
