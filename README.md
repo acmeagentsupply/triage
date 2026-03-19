@@ -15,7 +15,7 @@ No telemetry. No mutation. No background services.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/install.sh | bash
 ```
 
 First run:
@@ -137,12 +137,12 @@ Every run writes a timestamped bundle to `~/octriage-bundles/`:
 
 **System install (recommended):**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/install.sh | bash
 ```
 
 **User-only (no sudo required):**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash -s -- --user
+curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/install.sh | bash -s -- --user
 ```
 
 **Verify install matches source:**
@@ -152,7 +152,7 @@ bash scripts/install.sh --verify-from-source
 
 **Uninstall:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/scripts/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/scripts/uninstall.sh | bash
 ```
 
 ---
