@@ -26,7 +26,7 @@ triage --self-test && triage
 
 ![triage install and first run](docs/images/triage-hero.png)
 
-The proof bundle is written to `~/octriage-bundles/<timestamp>/` — real evidence files ready for review, support escalation, or pasting into an AI assistant.
+The proof bundle is written to `~/triage-bundles/<timestamp>/` — real evidence files ready for review, support escalation, or pasting into an AI assistant.
 
 ---
 
@@ -90,7 +90,7 @@ The value of `AT_RISK`: triage catches risk *before* failure, not just after. Ru
 
 ## The Proof Bundle
 
-Every run writes a timestamped bundle to `~/octriage-bundles/`:
+Every run writes a timestamped bundle to `~/triage-bundles/`:
 
 | File | Contents |
 |------|----------|
@@ -129,7 +129,7 @@ Every run writes a timestamped bundle to `~/octriage-bundles/`:
 
 **Auditable:** `cat $(which triage)` shows the full script. No compiled binary, no hidden behavior.
 
-**Proof bundle:** Writes only to `~/octriage-bundles/`. Nothing else.
+**Proof bundle:** Writes only to `~/triage-bundles/`. Nothing else.
 
 ---
 
@@ -162,7 +162,7 @@ curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/scripts
 | Item | Path |
 |------|------|
 | CLI binary | `/usr/local/bin/triage` (system) or `~/.local/bin/triage` (user) |
-| Proof bundles | `~/octriage-bundles/<timestamp>/` |
+| Proof bundles | `~/triage-bundles/<timestamp>/` |
 
 ---
 
@@ -193,7 +193,7 @@ Visual reference (print/PDF): [docs/cheatsheet-visual.html](docs/cheatsheet-visu
 
 1. `triage --self-test` — verify the tool is healthy before trusting its output
 2. `triage` — capture the proof bundle
-3. `ls ~/octriage-bundles/` — find the latest bundle
+3. `ls ~/triage-bundles/` — find the latest bundle
 4. Send `bundle_summary.txt` + `gateway_err_tail.txt` to support or an AI assistant
 
 → support@acmeagentsupply.com
