@@ -54,7 +54,7 @@ cat > "${APP_DIR}/Contents/MacOS/OCTriageUnit" << 'LAUNCHER'
 # SAFE: read-only triage tool; no config mutation; no network calls.
 CLI="$(which octriageunit 2>/dev/null || echo "")"
 if [[ -z "$CLI" ]]; then
-  osascript -e 'display alert "OCTriageUnit not installed" message "Run: bash scripts/install.sh\nSee https://github.com/CHE10X/octriageunit" as critical'
+  osascript -e 'display alert "OCTriageUnit not installed" message "Run: bash scripts/install.sh\nSee https://github.com/acmeagentsupply/triage" as critical'
   exit 1
 fi
 osascript << 'APPLE'

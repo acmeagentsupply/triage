@@ -179,6 +179,8 @@ Bundle format spec: [docs/proof-bundle-format.md](docs/proof-bundle-format.md)
 
 Quick reference: [CHEATSHEET.md](CHEATSHEET.md)
 
+Visual reference (print/PDF): [docs/cheatsheet-visual.html](docs/cheatsheet-visual.html)
+
 ---
 
 ## Threat Model

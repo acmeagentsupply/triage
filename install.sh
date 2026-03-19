@@ -2,8 +2,8 @@
 # OCTriageUnit — curl install entrypoint
 #
 # Usage (from GitHub):
-#   curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash -s -- --user
+#   curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/install.sh | bash -s -- --user
 #
 # This script clones the repo to a temp dir and delegates to scripts/install.sh.
 # Requires: git, bash, curl or wget.
@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-REPO="https://github.com/CHE10X/octriageunit.git"
+REPO="https://github.com/acmeagentsupply/triage.git"
 TMPDIR_BASE="${TMPDIR:-/tmp}"
 WORK="$(mktemp -d "${TMPDIR_BASE}/octriageunit-install.XXXXXX")"
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # OCTriageUnit uninstaller
 #
-# Via curl:  curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/scripts/uninstall.sh | bash
+# Via curl:  curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/scripts/uninstall.sh | bash
 # From repo: bash scripts/uninstall.sh
 #
 # SAFE: only removes files installed by the installer. Never touches your proof bundles.

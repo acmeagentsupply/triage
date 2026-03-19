@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>triage — Quick Reference</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green:   #22c55e;
+    --yellow:  #eab308;
+    --red:     #ef4444;
+    --blue:    #3b82f6;
+    --ink:     #0f172a;
+    --subtle:  #64748b;
+    --bg:      #f8fafc;
+    --panel:   #ffffff;
+    --border:  #e2e8f0;
+    --code-bg: #0f172a;
+    --code-fg: #e2e8f0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 24px;
+  }
+
+  /* ── Page layout ── */
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    display: grid;
+    gap: 16px;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    background: var(--ink);
+    border-radius: 12px;
+    color: white;
+  }
+
+  .header-left { display: flex; flex-direction: column; gap: 4px; }
+
+  .brand {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    color: white;
+  }
+
+  .tagline {
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+  }
+
+  .badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+
+  .badge-green  { background: rgba(34,197,94,0.15);  color: var(--green);  border: 1px solid rgba(34,197,94,0.3);  }
+  .badge-blue   { background: rgba(59,130,246,0.15); color: var(--blue);   border: 1px solid rgba(59,130,246,0.3); }
+  .badge-subtle { background: rgba(255,255,255,0.08); color: #94a3b8;      border: 1px solid rgba(255,255,255,0.12); }
+
+  /* ── Row layouts ── */
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+
+  .card-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--subtle);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .card-title .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px;
+    background: var(--ink);
+    color: white;
+    border-radius: 50%;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  /* ── Code blocks ── */
+  pre, .code-block {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .code-line { display: block; }
+  .code-comment { color: #475569; }
+  .code-cmd { color: #7dd3fc; }
+  .code-flag { color: #a5b4fc; }
+  .code-url { color: #86efac; }
+
+  /* ── Install block ── */
+  .install-block {
+    background: var(--code-bg);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .install-label {
+    padding: 6px 14px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #64748b;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .install-label.recommended { color: var(--green); }
+
+  .install-cmd {
+    padding: 10px 14px;
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-size: 11.5px;
+    color: #e2e8f0;
+    line-height: 1.6;
+  }
+
+  /* ── Signal table ── */
+  .signal-grid {
+    display: grid;
+    gap: 6px;
+  }
+
+  .signal-row {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    align-items: start;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+  }
+
+  .signal-name {
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--blue);
+  }
+
+  .signal-desc {
+    font-size: 12px;
+    color: var(--ink);
+    line-height: 1.4;
+  }
+
+  /* ── Status indicators ── */
+  .status-grid { display: grid; gap: 8px; }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 2px solid;
+  }
+
+  .status-row.healthy  { background: rgba(34,197,94,0.06);  border-color: rgba(34,197,94,0.3);  }
+  .status-row.at-risk  { background: rgba(234,179,8,0.06);  border-color: rgba(234,179,8,0.3);  }
+  .status-row.critical { background: rgba(239,68,68,0.06);  border-color: rgba(239,68,68,0.3);  }
+
+  .status-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .status-row.healthy  .status-dot { background: var(--green);  }
+  .status-row.at-risk  .status-dot { background: var(--yellow); }
+  .status-row.critical .status-dot { background: var(--red);    }
+
+  .status-label {
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    width: 90px;
+  }
+
+  .status-row.healthy  .status-label { color: var(--green);  }
+  .status-row.at-risk  .status-label { color: var(--yellow); }
+  .status-row.critical .status-label { color: var(--red);    }
+
+  .status-meaning {
+    font-size: 12px;
+    color: var(--ink);
+  }
+
+  /* ── Verify states ── */
+  .verify-grid { display: grid; gap: 6px; }
+
+  .verify-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+  }
+
+  .verify-chip {
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    min-width: 78px;
+    text-align: center;
+  }
+
+  .verify-match    { background: rgba(34,197,94,0.12);  color: #16a34a;  }
+  .verify-mismatch { background: rgba(239,68,68,0.12);  color: #dc2626;  }
+  .verify-unknown  { background: rgba(100,116,139,0.12); color: #475569; }
+
+  .verify-meaning { font-size: 12px; color: var(--ink); line-height: 1.4; }
+
+  /* ── Bundle files ── */
+  .bundle-grid { display: grid; gap: 5px; }
+
+  .bundle-row {
+    display: grid;
+    grid-template-columns: 170px 1fr;
+    align-items: start;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+  }
+
+  .bundle-file {
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .bundle-desc { font-size: 11.5px; color: var(--subtle); }
+
+  /* ── Guarantee pills ── */
+  .guarantee-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .guarantee-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #f8fafc;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .pill-icon { font-size: 15px; }
+
+  /* ── Steps ── */
+  .steps { display: flex; flex-direction: column; gap: 10px; }
+
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    background: var(--ink);
+    color: white;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-content { flex: 1; }
+
+  .step-desc {
+    font-size: 12px;
+    color: var(--subtle);
+    margin-top: 2px;
+  }
+
+  code {
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    background: #e2e8f0;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11.5px;
+    color: var(--ink);
+  }
+
+  /* ── Footer ── */
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--ink);
+    border-radius: 10px;
+    color: #64748b;
+    font-size: 11px;
+  }
+
+  .footer-brand {
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-weight: 700;
+    color: white;
+    font-size: 12px;
+  }
+
+  .footer-link {
+    color: #94a3b8;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  /* ── Print ── */
+  @media print {
+    body { padding: 0; background: white; }
+    .page { max-width: 100%; }
+    @page { margin: 16mm; size: A4 landscape; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="brand">triage</div>
+      <div class="tagline">Read-only diagnostics for OpenClaw &nbsp;·&nbsp; Works when OpenClaw doesn't</div>
+    </div>
+    <div class="badges">
+      <div class="badge badge-green">✓ Read-only</div>
+      <div class="badge badge-blue">✓ No telemetry</div>
+      <div class="badge badge-subtle">✓ Local-only</div>
+      <div class="badge badge-subtle">MIT License</div>
+    </div>
+  </div>
+
+  <!-- ROW 1: Install + First Run + Guarantees -->
+  <div class="row-3">
+
+    <!-- Install -->
+    <div class="card">
+      <div class="card-title"><span class="num">1</span> Install</div>
+      <div class="install-block">
+        <div class="install-label recommended">Recommended (system-wide)</div>
+        <div class="install-cmd">curl -fsSL https://raw.githubusercontent.com/<br>acmeagentsupply/triage/main/install.sh | bash</div>
+      </div>
+      <div style="height:8px"></div>
+      <div class="install-block">
+        <div class="install-label">User-only (no sudo)</div>
+        <div class="install-cmd">... | bash -s -- --user</div>
+      </div>
+    </div>
+
+    <!-- First Run -->
+    <div class="card">
+      <div class="card-title"><span class="num">2</span> First Run</div>
+      <pre><span class="code-cmd">triage</span> <span class="code-flag">--self-test</span>   <span class="code-comment"># verify tool first</span>
+<span class="code-cmd">triage</span>              <span class="code-comment"># full diagnostic</span></pre>
+      <div style="height: 10px"></div>
+      <div class="card-title" style="margin-bottom:8px;">The 3 commands</div>
+      <pre><span class="code-cmd">triage</span>              <span class="code-comment"># snapshot → bundle</span>
+<span class="code-cmd">triage</span> <span class="code-flag">--self-test</span>   <span class="code-comment"># check tool health</span>
+<span class="code-cmd">triage</span> <span class="code-flag">-watch</span>        <span class="code-comment"># live dashboard ★</span></pre>
+      <div style="height:6px;"></div>
+      <div style="font-size:10.5px; color: var(--subtle);">★ Commercial tier — <strong>acmeagentsupply.com</strong></div>
+    </div>
+
+    <!-- Safety guarantees -->
+    <div class="card">
+      <div class="card-title">Safety Guarantees</div>
+      <div class="guarantee-row">
+        <div class="guarantee-pill"><span class="pill-icon">🔒</span> Never modifies config</div>
+        <div class="guarantee-pill"><span class="pill-icon">📡</span> Zero outbound calls</div>
+        <div class="guarantee-pill"><span class="pill-icon">💻</span> Runs on your machine only</div>
+        <div class="guarantee-pill"><span class="pill-icon">👁️</span> Fully auditable shell script</div>
+        <div class="guarantee-pill"><span class="pill-icon">📁</span> Writes only to <code>~/octriage-bundles/</code></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Signals + Status codes -->
+  <div class="row-2">
+
+    <!-- Signals -->
+    <div class="card">
+      <div class="card-title">What triage checks</div>
+      <div class="signal-grid">
+        <div class="signal-row">
+          <div class="signal-name">gateway</div>
+          <div class="signal-desc">Is OpenClaw running and healthy?</div>
+        </div>
+        <div class="signal-row">
+          <div class="signal-name">sessions</div>
+          <div class="signal-desc">Agent count, orphan detection</div>
+        </div>
+        <div class="signal-row">
+          <div class="signal-name">disk</div>
+          <div class="signal-desc">Available disk space</div>
+        </div>
+        <div class="signal-row">
+          <div class="signal-name">verify</div>
+          <div class="signal-desc">Binary checksum vs. release</div>
+        </div>
+        <div class="signal-row">
+          <div class="signal-name">doctor</div>
+          <div class="signal-desc"><code>openclaw doctor</code> output (25s timeout)</div>
+        </div>
+        <div class="signal-row">
+          <div class="signal-name">compaction</div>
+          <div class="signal-desc">Context compaction state</div>
+        </div>
+        <div class="signal-row">
+          <div class="signal-name">activity</div>
+          <div class="signal-desc">Recent event rate across fleet</div>
+        </div>
+        <div class="signal-row">
+          <div class="signal-name">fleet</div>
+          <div class="signal-desc">Hostname, uptime, identity</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status codes + Verify -->
+    <div style="display:grid; gap:16px; grid-template-rows: auto 1fr;">
+
+      <!-- Status codes -->
+      <div class="card">
+        <div class="card-title">Reading the status</div>
+        <div class="status-grid">
+          <div class="status-row healthy">
+            <div class="status-dot"></div>
+            <div class="status-label">[HEALTHY]</div>
+            <div class="status-meaning">All signals clear. System is running normally.</div>
+          </div>
+          <div class="status-row at-risk">
+            <div class="status-dot"></div>
+            <div class="status-label">[AT_RISK]</div>
+            <div class="status-meaning">Something is degrading. System still running — catch it before it fails.</div>
+          </div>
+          <div class="status-row critical">
+            <div class="status-dot"></div>
+            <div class="status-label">[CRITICAL]</div>
+            <div class="status-meaning">Act now. Check signal lines above the status for what failed.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verify states -->
+      <div class="card">
+        <div class="card-title">verify states</div>
+        <div class="verify-grid">
+          <div class="verify-row">
+            <div class="verify-chip verify-match">MATCH</div>
+            <div class="verify-meaning">Binary matches release checksum. Trust its output.</div>
+          </div>
+          <div class="verify-row">
+            <div class="verify-chip verify-mismatch">MISMATCH</div>
+            <div class="verify-meaning">Binary modified since install. Reinstall before trusting output.</div>
+          </div>
+          <div class="verify-row">
+            <div class="verify-chip verify-unknown">UNKNOWN</div>
+            <div class="verify-meaning">No authoritative checksum available.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ROW 3: Bundle files + Something Broke -->
+  <div class="row-2">
+
+    <!-- Proof Bundle -->
+    <div class="card">
+      <div class="card-title">The Proof Bundle &nbsp;<span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--subtle);">written to <code>~/octriage-bundles/&lt;timestamp&gt;/</code></span></div>
+      <div class="bundle-grid">
+        <div class="bundle-row">
+          <div class="bundle-file">bundle_summary.txt</div>
+          <div class="bundle-desc">Version, timestamp, hostname</div>
+        </div>
+        <div class="bundle-row">
+          <div class="bundle-file">doctor_output.txt</div>
+          <div class="bundle-desc"><code>openclaw doctor</code> output (25s timeout)</div>
+        </div>
+        <div class="bundle-row">
+          <div class="bundle-file">gateway_err_tail.txt</div>
+          <div class="bundle-desc">Recent gateway error log</div>
+        </div>
+        <div class="bundle-row">
+          <div class="bundle-file">gateway_log_tail.txt</div>
+          <div class="bundle-desc">Last 120 lines of gateway log</div>
+        </div>
+        <div class="bundle-row">
+          <div class="bundle-file">openclaw_status.txt</div>
+          <div class="bundle-desc"><code>openclaw status</code> + deep gateway check</div>
+        </div>
+        <div class="bundle-row">
+          <div class="bundle-file">verify_integrity.txt</div>
+          <div class="bundle-desc">SHA comparison — installed vs. expected</div>
+        </div>
+        <div class="bundle-row">
+          <div class="bundle-file">manifest.sha256</div>
+          <div class="bundle-desc">Checksums for all bundle files</div>
+        </div>
+      </div>
+      <div style="margin-top:10px; padding: 9px 12px; background:#eff6ff; border-radius:6px; font-size:12px; border: 1px solid #bfdbfe;">
+        💡 <strong>Using the bundle:</strong> Paste <code>bundle_summary.txt</code> + <code>gateway_err_tail.txt</code> into a support ticket, or send to Claude/ChatGPT with <em>"here's my triage bundle, what's wrong?"</em>
+      </div>
+    </div>
+
+    <!-- Something broke + Uninstall -->
+    <div style="display:grid; gap:16px; grid-template-rows: 1fr auto;">
+
+      <!-- Something Broke -->
+      <div class="card">
+        <div class="card-title"><span class="num">!</span> Something Broke? Do This</div>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <code>triage --self-test</code>
+              <div class="step-desc">Confirm the tool itself is healthy before trusting its output</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <code>triage</code>
+              <div class="step-desc">Capture the full proof bundle</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <code>ls ~/octriage-bundles/</code>
+              <div class="step-desc">Find the latest timestamp folder</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              Send bundle to support or AI
+              <div class="step-desc">support@acmeagentsupply.com &nbsp;·&nbsp; or paste into Claude / ChatGPT</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Uninstall -->
+      <div class="card" style="padding: 14px 18px;">
+        <div class="card-title">Uninstall</div>
+        <div class="install-block">
+          <div class="install-cmd" style="font-size:10.5px;">curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/scripts/uninstall.sh | bash</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div>
+      <span class="footer-brand">triage</span>
+      &nbsp;·&nbsp; Read-only. Local-only. No telemetry.
+      &nbsp;·&nbsp; MIT License
+      &nbsp;·&nbsp; <a class="footer-link" href="https://github.com/acmeagentsupply/triage">github.com/acmeagentsupply/triage</a>
+    </div>
+    <div>
+      Live dashboard + RadCheck integration →
+      <strong style="color:white;">acmeagentsupply.com</strong>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

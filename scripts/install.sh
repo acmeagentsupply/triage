@@ -2,14 +2,14 @@
 # OCTriageUnit installer — works both from a cloned repo AND via curl pipe
 #
 # From repo:  bash scripts/install.sh [--user] [--verify-from-source] [--uninstall]
-# Via curl:   curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/scripts/install.sh | bash
+# Via curl:   curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/scripts/install.sh | bash
 #
 # SAFE: never modifies system config, restarts services, or writes outside install dir.
 
 set -eo pipefail
 
-REPO="https://github.com/CHE10X/octriageunit.git"
-RAW="https://raw.githubusercontent.com/CHE10X/octriageunit/main"
+REPO="https://github.com/acmeagentsupply/triage.git"
+RAW="https://raw.githubusercontent.com/acmeagentsupply/triage/main"
 BINARY_NAME="octriageunit"
 SYSTEM_PREFIX="/usr/local/bin"
 USER_PREFIX="${HOME}/.local/bin"

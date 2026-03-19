@@ -8,10 +8,10 @@
 
 ```bash
 # System install (recommended)
-curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/install.sh | bash
 
 # User-only (no sudo)
-curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/install.sh | bash -s -- --user
+curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/install.sh | bash -s -- --user
 ```
 
 First run:
@@ -93,7 +93,7 @@ Every run writes to `~/octriage-bundles/<timestamp>/`:
 ## Uninstall
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/CHE10X/octriageunit/main/scripts/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/scripts/uninstall.sh | bash
 ```
 
 ---
@@ -111,6 +111,13 @@ Only writes to `~/octriage-bundles/`.
 2. Run `triage` — captures the proof bundle
 3. Open the bundle: `ls ~/octriage-bundles/` → find the latest timestamp
 4. Paste `bundle_summary.txt` + `gateway_err_tail.txt` into support or an AI assistant
+
+---
+
+## Visual / Printable Version
+
+A one-page visual reference (Ikea-style, print to PDF):
+→ [docs/cheatsheet-visual.html](docs/cheatsheet-visual.html)
 
 ---
 
