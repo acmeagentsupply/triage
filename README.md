@@ -202,7 +202,7 @@ Visual reference (print/PDF): [docs/cheatsheet-visual.html](docs/cheatsheet-visu
 
 ## Want More?
 
-Live monitoring (`-watch` mode), reliability scoring, protection state, and RadCheck history integration are available in **Triage for Acme** — the commercial edition for teams running the full Acme reliability stack.
+Live monitoring (`-watch` mode), reliability scoring, and RadCheck integration are available at [acmeagentsupply.com](https://acmeagentsupply.com).
 
 → [acmeagentsupply.com](https://acmeagentsupply.com)
 

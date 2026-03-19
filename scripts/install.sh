@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OCTriageUnit installer — works both from a cloned repo AND via curl pipe
+# triage installer — works both from a cloned repo AND via curl pipe
 #
 # From repo:  bash scripts/install.sh [--user] [--verify-from-source] [--uninstall]
 # Via curl:   curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/scripts/install.sh | bash
@@ -41,7 +41,7 @@ get_version() {
 
 print_header() {
   local ver="${1:-}"
-  printf '\n\033[1mOCTriageUnit%s — Installer\033[0m\n' "${ver:+ v${ver}}"
+  printf '\n\033[1mtriage%s — Installer\033[0m\n' "${ver:+ v${ver}}"
   printf '  Read-only triage tool | No telemetry | Local-only\n\n'
 }
 

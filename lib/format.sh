@@ -8,7 +8,7 @@ octu_should_print_live_output() {
 
 octu_print_banner() {
   octu_should_print_live_output || return 0
-  printf 'OCTriageUnit - Control Plane Snapshot\n'
+  printf 'triage - Control Plane Snapshot\n'
   printf 'Mode: read-only\n'
   printf 'Target: local OpenClaw environment\n'
   printf 'Safety: read-only • no network • no config writes\n'

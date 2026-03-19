@@ -1,6 +1,6 @@
 # Redacted Sample Bundle
 
-This is an example OCTriageUnit proof bundle with sensitive values replaced by `[REDACTED]`.
+This is an example triage proof bundle with sensitive values replaced by `[REDACTED]`.
 
 Use this as a reference when:
 - Filing a support request with ACME Agent Supply Co.

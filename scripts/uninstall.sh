@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OCTriageUnit uninstaller
+# triage uninstaller
 #
 # Via curl:  curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/scripts/uninstall.sh | bash
 # From repo: bash scripts/uninstall.sh
@@ -15,7 +15,7 @@ USER_PREFIX="${HOME}/.local/bin"
 ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 info() { printf '  \033[34m•\033[0m %s\n' "$*"; }
 
-printf '\n\033[1mOCTriageUnit — Uninstaller\033[0m\n\n'
+printf '\n\033[1mtriage — Uninstaller\033[0m\n\n'
 
 removed=0
 for prefix in "${SYSTEM_PREFIX}" "${USER_PREFIX}"; do

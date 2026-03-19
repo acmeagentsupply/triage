@@ -1,4 +1,4 @@
-OCTriageUnit proof bundle
+triage proof bundle
 created_at=20260101-120000
 mode=read-only
 notes=REDACTED SAMPLE — hostnames, paths, and credentials have been replaced with [REDACTED]

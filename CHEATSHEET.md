@@ -124,4 +124,4 @@ A one-page visual reference (Ikea-style, print to PDF):
 ## Want more?
 
 Live dashboard, reliability scoring, RadCheck integration:
-→ **Triage for Acme** at [acmeagentsupply.com](https://acmeagentsupply.com)
+→ [acmeagentsupply.com](https://acmeagentsupply.com)

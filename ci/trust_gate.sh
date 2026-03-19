@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ci/trust_gate.sh — OCTriageUnit pre-release trust gate
+# ci/trust_gate.sh — triage pre-release trust gate
 # Validates syntax, flags, README consistency, and read-only guarantees.
 # Exits 0 on full pass; non-zero on any failure.
 # SAFE: read-only checks only. No installs, no service changes.
