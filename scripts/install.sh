@@ -10,7 +10,7 @@ set -eo pipefail
 
 REPO="https://github.com/acmeagentsupply/triage.git"
 RAW="https://raw.githubusercontent.com/acmeagentsupply/triage/main"
-BINARY_NAME="octriageunit"
+BINARY_NAME="triage"
 SYSTEM_PREFIX="/usr/local/bin"
 USER_PREFIX="${HOME}/.local/bin"
 
@@ -80,7 +80,7 @@ run_verify_from_source() {
   local install_dir="${1:-${SYSTEM_PREFIX}}"
   local installed="${install_dir}/${BINARY_NAME}"
   printf '\n\033[1mVerify-From-Source\033[0m\n'
-  [[ -f "$installed" ]] || die "octriageunit not found at ${installed} — install first"
+  [[ -f "$installed" ]] || die "triage not found at ${installed} — install first"
 
   local src_hash installed_hash
   if [[ -n "$SRC_BINARY" ]]; then
@@ -126,7 +126,7 @@ do_install() {
   ok "Version:   ${ver}"
   ok "SHA256:    $(sha256_file "${dest}")"
   run_self_test "$dest"
-  printf '\n  Run: \033[1moctriageunit --help\033[0m\n\n'
+  printf '\n  Run: \033[1mtriage --help\033[0m\n\n'
 }
 
 # ── Uninstall ────────────────────────────────────────────────────────────────
@@ -141,8 +141,8 @@ do_uninstall() {
     fi
     [[ -f "${checksum_file}" ]] && rm -f "${checksum_file}"
   done
-  [[ $removed -eq 0 ]] && info "Nothing to remove (octriageunit not found in standard locations)"
-  info "Proof bundles in ~/octriage-bundles/ are NOT removed (your data)"
+  [[ $removed -eq 0 ]] && info "Nothing to remove (triage not found in standard locations)"
+  info "Proof bundles in ~/triage-bundles/ are NOT removed (your data)"
 }
 
 # ── Main ─────────────────────────────────────────────────────────────────────

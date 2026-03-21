@@ -43,7 +43,7 @@ bash "$BIN" --self-test 2>/dev/null | grep -q "PASSED"  && ok "--self-test PASSE
 info "Gate 5: README consistency"
 README="${REPO_ROOT}/README.md"
 grep -q "scripts/install.sh" "$README" && ok "README refs scripts/install.sh" || fail "README missing scripts/install.sh reference"
-grep -q "octriage-bundles"   "$README" && ok "README states bundle dir" || fail "README missing bundle dir"
+grep -q "triage-bundles"   "$README" && ok "README states bundle dir" || fail "README missing bundle dir"
 grep -q "UNINSTALL.md"       "$README" && ok "README refs UNINSTALL.md" || fail "README missing UNINSTALL.md ref"
 grep -q "control-plane-trusted.svg" "$README" && ok "README has trust badge" || fail "README missing trust badge"
 

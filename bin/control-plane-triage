@@ -3,13 +3,13 @@
 # OCTriageUnit control-plane triage entrypoint
 # READ-ONLY MODE: this script must not modify system configuration or service state.
 # NO NETWORK CALLS: this script must not initiate outbound network activity or telemetry.
-# NO CONFIG MUTATION: this script must not write outside ~/octriage-bundles/ proof artifacts.
+# NO CONFIG MUTATION: this script must not write outside ~/triage-bundles/ proof artifacts.
 #
 # Safety: read-only • no network • no config writes
 
 set -u
 
-readonly BUNDLE_ROOT="${HOME}/octriage-bundles"
+readonly BUNDLE_ROOT="${HOME}/triage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
 readonly EMBEDDED_VERSION="0.1.5"   # injected at install time if standalone
@@ -326,7 +326,7 @@ overall_status() {
 
 installed_cli_sha() {
   local installed_path
-  installed_path="$(command -v octriageunit 2>/dev/null || true)"
+  installed_path="$(command -v triage 2>/dev/null || true)"
   [[ -n "${installed_path}" ]] || installed_path="${BASH_SOURCE[0]}"
   [[ -f "${installed_path}" ]] || return 1
   sha256_file "${installed_path}"
@@ -335,13 +335,13 @@ installed_cli_sha() {
 expected_cli_sha() {
   local installed_path manifest
 
-  installed_path="$(command -v octriageunit 2>/dev/null || true)"
+  installed_path="$(command -v triage 2>/dev/null || true)"
   if [[ -n "${installed_path}" && -f "${installed_path}.sha256" ]]; then
     awk '{print $1; exit}' "${installed_path}.sha256"
     return 0
   fi
 
-  manifest="$(find "${SCRIPT_DIR}/../dist" -maxdepth 1 -type f -name 'octriageunit-*.sha256' 2>/dev/null | head -n 1)"
+  manifest="$(find "${SCRIPT_DIR}/../dist" -maxdepth 1 -type f -name 'triage-*.sha256' 2>/dev/null | head -n 1)"
   if [[ -n "${manifest}" && -f "${manifest}" ]]; then
     awk '{print $1; exit}' "${manifest}"
     return 0
@@ -349,7 +349,7 @@ expected_cli_sha() {
 
   for manifest in "${SCRIPT_DIR}/../dist/manifest.sha256" "${SCRIPT_DIR}/../SHA256SUMS" "${SCRIPT_DIR}/manifest.sha256"; do
     [[ -f "${manifest}" ]] || continue
-    awk '/(bin\/control-plane-triage|octriageunit)$/ {print $1; exit}' "${manifest}"
+    awk '/(bin\/control-plane-triage|triage)$/ {print $1; exit}' "${manifest}"
     return 0
   done
 
@@ -380,7 +380,7 @@ canonical_expected_cli_sha_for_repo() {
     "${repo_root}/SHA256SUMS"
   do
     [[ -f "${manifest}" ]] || continue
-    awk '/(bin\/control-plane-triage|octriageunit)$/ {print $1; exit}' "${manifest}"
+    awk '/(bin\/control-plane-triage|triage)$/ {print $1; exit}' "${manifest}"
     return 0
   done
 
@@ -425,7 +425,7 @@ canonical_source_audit() {
     done < <(run_timeout "${search_timeout}" find "${root}" -maxdepth 4 -name .git -type d 2>/dev/null || true)
   done
 
-  installed_path="$(command -v octriageunit 2>/dev/null || true)"
+  installed_path="$(command -v triage 2>/dev/null || true)"
   installed_sha="$(installed_cli_sha 2>/dev/null || true)"
   installed_version="$("${installed_path:-/usr/bin/false}" --version 2>/dev/null | awk '{print $2; exit}' || true)"
 
@@ -459,14 +459,14 @@ canonical_source_audit() {
     [[ -w "${repo_root}" ]] && writable="true"
 
     dirty="unknown"
-    if run_timeout "${search_timeout}" git -C "${repo_root}" status --porcelain >/tmp/octriage_status.$$ 2>/dev/null; then
-      if [[ -s /tmp/octriage_status.$$ ]]; then
+    if run_timeout "${search_timeout}" git -C "${repo_root}" status --porcelain >/tmp/triage_status.$$ 2>/dev/null; then
+      if [[ -s /tmp/triage_status.$$ ]]; then
         dirty="true"
       else
         dirty="false"
       fi
     fi
-    rm -f /tmp/octriage_status.$$ 2>/dev/null || true
+    rm -f /tmp/triage_status.$$ 2>/dev/null || true
 
     if [[ "${marker}" = "true" ]]; then
       marker_repos+=("${repo_root}")
@@ -652,7 +652,7 @@ OCTriageUnit safety guarantees
   - Read-only: never modifies system state
   - No telemetry: zero outbound calls
   - Local-only: all execution on the operator machine
-  - Proof bundle output: ~/octriage-bundles/ only
+  - Proof bundle output: ~/triage-bundles/ only
   - Auditable source: cat bin/control-plane-triage
 
 Usage:
@@ -941,7 +941,7 @@ main() {
       --version|-version)
         local ver
         ver="$(cat "${VERSION_FILE}" 2>/dev/null || echo "${EMBEDDED_VERSION}")"
-        printf 'octriageunit %s\n' "${ver}"
+        printf 'triage %s\n' "${ver}"
         return 0
         ;;
       --self-test|-self-test)

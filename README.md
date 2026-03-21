@@ -202,7 +202,7 @@ Visual reference (print/PDF): [docs/cheatsheet-visual.html](docs/cheatsheet-visu
 
 ## Want More?
 
-Live monitoring (`-watch` mode), reliability scoring, and RadCheck integration are available at [acmeagentsupply.com](https://acmeagentsupply.com).
+Reliability scoring, RadCheck integration, and the full Acme agent stack are available at [acmeagentsupply.com](https://acmeagentsupply.com).
 
 → [acmeagentsupply.com](https://acmeagentsupply.com)
 
@@ -218,4 +218,4 @@ MIT. See [LICENSE](LICENSE).
 
 Open source under MIT. Issues and PRs welcome.
 
-This repo is the OSS core. The commercial edition (`-watch`, Observe panel, RadCheck trend) lives at [acmeagentsupply.com](https://acmeagentsupply.com).
+This repo is the OSS core. The commercial Acme stack (Observe panel, RadCheck trend, and more) lives at [acmeagentsupply.com](https://acmeagentsupply.com).

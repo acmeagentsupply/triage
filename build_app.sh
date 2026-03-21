@@ -35,7 +35,7 @@ cat > "${APP_DIR}/Contents/Info.plist" << PLIST
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>         <string>OCTriageUnit</string>
-  <key>CFBundleIdentifier</key>   <string>co.acmeagent.octriageunit</string>
+  <key>CFBundleIdentifier</key>   <string>co.acmeagent.triage</string>
   <key>CFBundleVersion</key>      <string>${VERSION}</string>
   <key>CFBundleShortVersionString</key> <string>${VERSION}</string>
   <key>CFBundleExecutable</key>   <string>OCTriageUnit</string>
@@ -47,12 +47,12 @@ cat > "${APP_DIR}/Contents/Info.plist" << PLIST
 </plist>
 PLIST
 
-# macOS launcher — opens Terminal.app and runs octriageunit
+# macOS launcher — opens Terminal.app and runs triage
 cat > "${APP_DIR}/Contents/MacOS/OCTriageUnit" << 'LAUNCHER'
 #!/usr/bin/env bash
 # OCTriageUnit.app launcher — opens a terminal and runs the CLI
 # SAFE: read-only triage tool; no config mutation; no network calls.
-CLI="$(which octriageunit 2>/dev/null || echo "")"
+CLI="$(which triage 2>/dev/null || echo "")"
 if [[ -z "$CLI" ]]; then
   osascript -e 'display alert "OCTriageUnit not installed" message "Run: bash scripts/install.sh\nSee https://github.com/acmeagentsupply/triage" as critical'
   exit 1
@@ -60,7 +60,7 @@ fi
 osascript << 'APPLE'
 tell application "Terminal"
   activate
-  do script "echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'; echo 'OCTriageUnit — Control Plane Triage'; echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'; octriageunit"
+  do script "echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'; echo 'Triage — Control Plane Diagnostics'; echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'; triage"
 end tell
 APPLE
 LAUNCHER

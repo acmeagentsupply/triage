@@ -163,7 +163,7 @@ octu_compact_value() {
 }
 
 octu_last_incident_summary() {
-  local history_path="${OCTU_HISTORY_HOOK_PATH:-${HOME}/.openclaw/octriage/history.log}"
+  local history_path="${OCTU_HISTORY_HOOK_PATH:-${HOME}/.openclaw/triage/history.log}"
   local last_line
 
   [[ -f "$history_path" ]] || return 1
@@ -351,7 +351,7 @@ octu_build_share_text() {
       printf 'Top patterns:\n'
       octu_top_patterns_block 3
       printf 'Bundle: %s\n' "$(octu_pretty_path "$OCTU_BUNDLE_DIR")"
-      printf 'How to reproduce: run octriageunit\n'
+      printf 'How to reproduce: run triage\n'
       printf 'No restarts / read-only\n'
     }
   )"

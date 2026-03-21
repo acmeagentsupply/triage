@@ -7,7 +7,7 @@ triage exists to help operators investigate OpenClaw control plane issues withou
 ### 1. Read-Only By Default
 
 triage must not modify configuration, restart services, reload daemons, rotate credentials, or make durable state changes as part of normal operation. Diagnostic collection is read-only. The only files it may create are proof bundle artifacts under `~/triage-bundles/`.
-triage must not modify configuration, restart services, reload daemons, rotate credentials, or make durable state changes as part of normal operation. Diagnostic collection is read-only. The only files it may create are proof bundle artifacts under `~/octriage-bundles/`.
+triage must not modify configuration, restart services, reload daemons, rotate credentials, or make durable state changes as part of normal operation. Diagnostic collection is read-only. The only files it may create are proof bundle artifacts under `~/triage-bundles/`.
 
 ### 2. No Security Through Obscurity
 

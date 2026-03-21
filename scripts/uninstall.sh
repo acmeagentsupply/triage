@@ -8,7 +8,7 @@
 
 set -uo pipefail
 
-BINARY_NAME="octriageunit"
+BINARY_NAME="triage"
 SYSTEM_PREFIX="/usr/local/bin"
 USER_PREFIX="${HOME}/.local/bin"
 
@@ -27,9 +27,9 @@ for prefix in "${SYSTEM_PREFIX}" "${USER_PREFIX}"; do
   fi
 done
 
-[[ $removed -eq 0 ]] && info "Nothing to remove (octriageunit not found in standard locations)"
+[[ $removed -eq 0 ]] && info "Nothing to remove (triage not found in standard locations)"
 
-info "Proof bundles in ~/octriage-bundles/ are NOT removed (your data)"
-printf '\n  Verify: \033[1mwhich octriageunit 2>/dev/null || echo "Removed."\033[0m\n\n'
+info "Proof bundles in ~/triage-bundles/ are NOT removed (your data)"
+printf '\n  Verify: \033[1mwhich triage 2>/dev/null || echo "Removed."\033[0m\n\n'
 
 exit 0

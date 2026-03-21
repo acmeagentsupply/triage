@@ -25,7 +25,6 @@ triage --self-test && triage
 
 ```bash
 triage                    # Full diagnostic snapshot → proof bundle
-triage -watch             # Live dashboard (commercial tier)
 triage --self-test        # Verify install integrity before trusting output
 ```
 
@@ -123,5 +122,5 @@ A one-page visual reference (Ikea-style, print to PDF):
 
 ## Want more?
 
-Live dashboard, reliability scoring, RadCheck integration:
+Reliability scoring, RadCheck integration, and the full Acme agent stack:
 → [acmeagentsupply.com](https://acmeagentsupply.com)

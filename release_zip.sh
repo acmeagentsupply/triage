@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # release_zip.sh — OCTriageUnit release packager
-# Produces: dist/octriageunit-<VERSION>-release.zip
+# Produces: dist/triage-<VERSION>-release.zip
 # Must run AFTER build_app.sh (requires Applications/ + dist/manifest.sha256)
 # SAFE: no installs, no network calls, no service changes.
 
@@ -8,7 +8,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERSION="$(cat "${REPO_ROOT}/VERSION" 2>/dev/null | tr -d '[:space:]')"
 DIST_DIR="${REPO_ROOT}/dist"
-ZIP_NAME="octriageunit-${VERSION}-release.zip"
+ZIP_NAME="triage-${VERSION}-release.zip"
 ZIP_PATH="${DIST_DIR}/${ZIP_NAME}"
 
 info() { printf '  \033[34m•\033[0m %s\n' "$*"; }
