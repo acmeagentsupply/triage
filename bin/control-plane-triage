@@ -422,11 +422,12 @@ builder_summary() {
 }
 
 disk_summary() {
-  # Canonical metric: root volume (/) percent used — matches ORP disk calculation.
-  # $HOME was retired (measured home-volume scope, differed from ORP's / scope).
+  # Canonical metric: the operator's home/data volume, because that is where
+  # OpenClaw state, media, backups, and workspace files actually accumulate.
+  local disk_target="${HOME}"
   local percent avail_human oc_size
-  percent="$(df -Pk / 2>/dev/null | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
-  avail_human="$(df -h / 2>/dev/null | awk 'NR==2 {print $4}')"
+  percent="$(df -Pk "${disk_target}" 2>/dev/null | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
+  avail_human="$(df -h "${disk_target}" 2>/dev/null | awk 'NR==2 {print $4}')"
   oc_size="$(du -sh "${HOME}/.openclaw" 2>/dev/null | awk '{print $1}')"
   [[ -n "${percent}" ]] || {
     printf 'UNKNOWN'
