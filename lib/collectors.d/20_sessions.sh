@@ -10,6 +10,11 @@ collector_run() {
   local lineage="UNKNOWN"
   local max_children=0
   local agent_dir sessions_dir ref_file session_file parent
+  local artifact_state="OK"
+  local confidence="HIGH"
+  local cli_exit_code=0
+  local cli_timed_out="false"
+  local bytes_captured=0
 
   if [[ ! -d "${sessions_root}" ]]; then
     cat > "${bundle_dir}/agent_session_topology.txt" <<EOF
@@ -21,12 +26,26 @@ active_sessions: unknown
 agent_lineage: UNKNOWN
 max_context_usage: unknown
 classification: UNKNOWN
+artifact_state: OK
+confidence: MEDIUM
 EOF
-    printf 'collector_status id=%s state=UNKNOWN agents=0 recent=0 orphan=0 total=0 lineage=UNKNOWN\n' "$COLLECTOR_ID"
+    COLLECTOR_META_COMMAND="openclaw sessions -json"
+    COLLECTOR_META_EXIT_CODE="0"
+    COLLECTOR_META_TIMED_OUT="false"
+    COLLECTOR_META_BYTES_CAPTURED="$(octu_file_bytes "${bundle_dir}/agent_session_topology.txt")"
+    COLLECTOR_META_CONFIDENCE="MEDIUM"
+    COLLECTOR_META_ARTIFACT_STATE="OK"
+    COLLECTOR_META_RESULT_STATE="UNKNOWN"
+    printf 'collector_status id=%s state=UNKNOWN agents=0 recent=0 orphan=0 total=0 lineage=UNKNOWN artifact_state=OK confidence=MEDIUM\n' "$COLLECTOR_ID"
     return 20
   fi
 
-  if run_timeout "${COLLECT_TIMEOUT}" openclaw sessions -json > "${cli_json}" 2>/dev/null; then
+  capture_command "${cli_json}" openclaw sessions -json
+  cli_exit_code="${CAPTURE_EXIT_CODE}"
+  cli_timed_out="${CAPTURE_TIMED_OUT}"
+  artifact_state="${CAPTURE_ARTIFACT_STATE}"
+
+  if [[ "${artifact_state}" = "OK" ]]; then
     active="$(grep -Eo '"(session_id|sessionId|id)"' "${cli_json}" 2>/dev/null | wc -l | tr -d ' ')"
     [[ -n "$active" ]] || active="unknown"
     max_children="$(grep -Eo '"parent(Id|_id)"[[:space:]]*:[[:space:]]*"[^"]+"' "${cli_json}" 2>/dev/null | sed -E 's/.*"([^"]+)"$/\1/' | sort | uniq -c | awk 'BEGIN{m=0} {if ($1>m) m=$1} END{print m+0}')"
@@ -66,12 +85,23 @@ EOF
     done < <(find "${sessions_dir}" -maxdepth 1 -type f -name '*.json' -print0 2>/dev/null)
   done < <(find "${sessions_root}" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
 
-  if (( orphan > 0 || total > 50 )); then
+  if [[ "${artifact_state}" != "OK" ]]; then
+    classification="INCOMPLETE"
+    confidence="LOW"
+  elif (( orphan > 0 || total > 50 )); then
     classification="FANOUT_ANOMALY"
   elif (( recent > 10 )); then
     classification="HIGH_ACTIVITY"
   elif (( agents > 0 )); then
     classification="NORMAL"
+  fi
+
+  if [[ "${artifact_state}" = "OK" && ! -s "${cli_json}" ]]; then
+    artifact_state="LOW_CONFIDENCE"
+    classification="INCOMPLETE"
+    confidence="LOW"
+  elif [[ "${artifact_state}" = "OK" ]]; then
+    confidence="HIGH"
   fi
 
   cat > "${bundle_dir}/agent_session_topology.txt" <<EOF
@@ -83,9 +113,21 @@ active_sessions: ${active}
 agent_lineage: ${lineage}
 max_context_usage: unknown
 classification: ${classification}
+artifact_state: ${artifact_state}
+confidence: ${confidence}
 EOF
 
-  printf 'collector_status id=%s state=%s agents=%s recent=%s orphan=%s total=%s lineage=%s\n' "$COLLECTOR_ID" "$classification" "$agents" "$recent" "$orphan" "$total" "$lineage"
+  bytes_captured="$(octu_sum_file_bytes "${cli_json}" "${bundle_dir}/agent_session_topology.txt")"
+  COLLECTOR_META_COMMAND="openclaw sessions -json"
+  COLLECTOR_META_EXIT_CODE="${cli_exit_code}"
+  COLLECTOR_META_TIMED_OUT="${cli_timed_out}"
+  COLLECTOR_META_BYTES_CAPTURED="${bytes_captured}"
+  COLLECTOR_META_CONFIDENCE="${confidence}"
+  COLLECTOR_META_ARTIFACT_STATE="${artifact_state}"
+  COLLECTOR_META_RESULT_STATE="${classification}"
+
+  printf 'collector_status id=%s state=%s agents=%s recent=%s orphan=%s total=%s lineage=%s artifact_state=%s confidence=%s\n' \
+    "$COLLECTOR_ID" "$classification" "$agents" "$recent" "$orphan" "$total" "$lineage" "$artifact_state" "$confidence"
   case "$classification" in
     NORMAL) return 0 ;;
     UNKNOWN) return 20 ;;

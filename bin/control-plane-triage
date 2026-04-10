@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# OCTriageUnit control-plane triage entrypoint
+# Triage control-plane diagnostic entrypoint
 # READ-ONLY MODE: this script must not modify system configuration or service state.
 # NO NETWORK CALLS: this script must not initiate outbound network activity or telemetry.
 # NO CONFIG MUTATION: this script must not write outside ~/triage-bundles/ proof artifacts.
@@ -12,8 +12,9 @@ set -u
 readonly BUNDLE_ROOT="${HOME}/triage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
-readonly EMBEDDED_VERSION="0.1.5"   # injected at install time if standalone
+readonly EMBEDDED_VERSION="0.1.6"   # injected at install time if standalone
 readonly COLLECT_TIMEOUT=2          # seconds; applied to each slow command
+readonly INVOKED_NAME="$(basename "${0}")"
 OCTU_COLOR_MODE="${OCTU_COLOR_MODE:-auto}"
 readonly COLLECTOR_DIR="${SCRIPT_DIR}/../lib/collectors.d"
 readonly STATUS_REDUCER="${SCRIPT_DIR}/../lib/status_reduce.sh"
@@ -70,10 +71,10 @@ icon_for_state() {
     OK|HEALTHY|NORMAL|SCHEDULED)
       printf '✓'
       ;;
-    WARN*|DEGRADED*|HIGH_ACTIVITY)
+    WARN*|DEGRADED*|HIGH_ACTIVITY|INCOMPLETE|LOW_CONFIDENCE)
       printf '!'
       ;;
-    STALE*|STOPPED*|FAIL*|FANOUT_ANOMALY)
+    STALE*|STOPPED*|FAIL*|FANOUT_ANOMALY|CONTRADICTION_DETECTED)
       printf '×'
       ;;
     NOT\ DETECTED|UNKNOWN*)
@@ -91,10 +92,10 @@ color_for_state() {
     OK|HEALTHY|NORMAL|SCHEDULED)
       printf '32'
       ;;
-    WARN*|DEGRADED*|HIGH_ACTIVITY)
+    WARN*|DEGRADED*|HIGH_ACTIVITY|INCOMPLETE|LOW_CONFIDENCE)
       printf '33'
       ;;
-    STALE*|STOPPED*|FAIL*|FANOUT_ANOMALY)
+    STALE*|STOPPED*|FAIL*|FANOUT_ANOMALY|CONTRADICTION_DETECTED)
       printf '31'
       ;;
     NOT\ DETECTED|UNKNOWN*)
@@ -125,6 +126,164 @@ json_escape() {
   input="${input//$'\r'/\\r}"
   input="${input//$'\t'/\\t}"
   printf '%s' "${input}"
+}
+
+octu_file_bytes() {
+  local target="$1"
+  if [[ -f "${target}" ]]; then
+    wc -c < "${target}" | tr -d ' '
+  else
+    printf '0'
+  fi
+}
+
+octu_sum_file_bytes() {
+  local total=0
+  local target bytes
+  for target in "$@"; do
+    [[ -n "${target}" ]] || continue
+    bytes="$(octu_file_bytes "${target}")"
+    total=$((total + ${bytes:-0}))
+  done
+  printf '%s' "${total}"
+}
+
+octu_artifact_rank() {
+  case "${1:-OK}" in
+    OK) printf '0' ;;
+    PARTIAL) printf '1' ;;
+    TIMEOUT_PARTIAL) printf '2' ;;
+    TIMEOUT_EMPTY) printf '3' ;;
+    PARSE_ERROR) printf '4' ;;
+    LOW_CONFIDENCE) printf '5' ;;
+    *) printf '6' ;;
+  esac
+}
+
+octu_worst_artifact_state() {
+  local worst="OK"
+  local worst_rank state state_rank
+  worst_rank="$(octu_artifact_rank "${worst}")"
+  for state in "$@"; do
+    [[ -n "${state}" ]] || continue
+    state_rank="$(octu_artifact_rank "${state}")"
+    if (( state_rank > worst_rank )); then
+      worst="${state}"
+      worst_rank="${state_rank}"
+    fi
+  done
+  printf '%s' "${worst}"
+}
+
+octu_confidence_for_artifact_state() {
+  case "${1:-OK}" in
+    OK) printf 'HIGH' ;;
+    PARTIAL|TIMEOUT_PARTIAL) printf 'MEDIUM' ;;
+    *) printf 'LOW' ;;
+  esac
+}
+
+capture_command() {
+  local outfile="$1"
+  shift
+
+  local exit_code=0
+  local timed_out="false"
+  local artifact_state="OK"
+  local bytes_captured
+
+  : > "${outfile}"
+  if run_timeout "${COLLECT_TIMEOUT}" "$@" > "${outfile}" 2>&1; then
+    exit_code=0
+  else
+    exit_code=$?
+  fi
+
+  if [[ "${exit_code}" = "124" || "${exit_code}" = "143" ]]; then
+    timed_out="true"
+  fi
+
+  bytes_captured="$(octu_file_bytes "${outfile}")"
+  if [[ "${timed_out}" = "true" ]]; then
+    if (( bytes_captured > 0 )); then
+      artifact_state="TIMEOUT_PARTIAL"
+      printf '\nTIMEOUT after %ss\n' "${COLLECT_TIMEOUT}" >> "${outfile}"
+    else
+      artifact_state="TIMEOUT_EMPTY"
+      printf 'timeout\n' > "${outfile}"
+    fi
+  elif (( exit_code != 0 )); then
+    if (( bytes_captured > 0 )); then
+      artifact_state="PARTIAL"
+    else
+      artifact_state="PARSE_ERROR"
+    fi
+  elif (( bytes_captured == 0 )); then
+    artifact_state="PARTIAL"
+  fi
+
+  CAPTURE_EXIT_CODE="${exit_code}"
+  CAPTURE_TIMED_OUT="${timed_out}"
+  CAPTURE_ARTIFACT_STATE="${artifact_state}"
+  CAPTURE_BYTES_CAPTURED="$(octu_file_bytes "${outfile}")"
+  return 0
+}
+
+redact_secret_stream() {
+  python3 -c "$(cat <<'PY'
+import re
+import sys
+
+patterns = [
+    re.compile(
+        r'(?P<name>\b[A-Za-z_][A-Za-z0-9_]*(?:'
+        r'TOKEN|API[_-]?KEY|ACCESS[_-]?KEY|SECRET|SECRET[_-]?KEY|'
+        r'PASSWORD|PASSWD|PASS|AUTH|AUTHORIZATION|BEARER|'
+        r'SESSION|COOKIE|CREDENTIALS?|PRIVATE[_-]?KEY|CLIENT[_-]?SECRET'
+        r')[A-Za-z0-9_]*\b)'
+        r'(?P<sep>\s*(?:=|=>|:)\s*)'
+        r'(?P<value>[^\n]*)'
+    ),
+    re.compile(
+        r'(?P<prefix>\bAuthorization\b\s*:\s*Bearer\s+)(?P<value>[^\s,;]+)',
+        re.IGNORECASE,
+    ),
+]
+
+def redact(line: str) -> str:
+    def repl_named(match: re.Match[str]) -> str:
+        return f"{match.group('name')}{match.group('sep')}[REDACTED]"
+
+    def repl_bearer(match: re.Match[str]) -> str:
+        return f"{match.group('prefix')}[REDACTED]"
+
+    line = patterns[0].sub(repl_named, line)
+    line = patterns[1].sub(repl_bearer, line)
+    return line
+
+for raw_line in sys.stdin:
+    sys.stdout.write(redact(raw_line))
+PY
+)"
+}
+
+export -f redact_secret_stream 2>/dev/null || true
+
+octu_write_collector_metadata_file() {
+  local outfile="$1"
+  local id="$2"
+  local script_path="$3"
+  local command_name="$4"
+  local exit_code="$5"
+  local timed_out="$6"
+  local bytes_captured="$7"
+  local confidence="$8"
+  local artifact_state="$9"
+  local result_state="${10:-UNKNOWN}"
+
+  cat > "${outfile}" <<EOF
+{"id":"$(json_escape "${id}")","script":"$(json_escape "${script_path}")","command":"$(json_escape "${command_name}")","exit_code":${exit_code:-0},"timed_out":${timed_out:-false},"bytes_captured":${bytes_captured:-0},"confidence":"$(json_escape "${confidence:-LOW}")","artifact_state":"$(json_escape "${artifact_state:-LOW_CONFIDENCE}")","result_state":"$(json_escape "${result_state}")"}
+EOF
 }
 
 render_signal_line() {
@@ -648,19 +807,23 @@ render_operator_brief() {
 print_help() {
   # SAFE: Prints local help text only; does not inspect services, mutate config, or access the network.
   cat <<'EOF'
-OCTriageUnit safety guarantees
+Triage safety guarantees
   - Read-only: never modifies system state
   - No telemetry: zero outbound calls
   - Local-only: all execution on the operator machine
   - Proof bundle output: ~/triage-bundles/ only
-  - Auditable source: cat bin/control-plane-triage
+  - Auditable source: cat "$(command -v triage)"
 
 Usage:
-  bin/control-plane-triage
-  bin/control-plane-triage --help
-  bin/control-plane-triage --version
-  bin/control-plane-triage --self-test
-  bin/control-plane-triage --color=auto|always|never
+  triage
+  triage --help
+  triage --version
+  triage --self-test
+  triage --color=auto|always|never
+
+Deprecated aliases:
+  OCTriage
+  octriageunit
 
 Behavior:
   - verifies required local tools are present
@@ -668,6 +831,14 @@ Behavior:
   - collects real evidence: doctor output, gateway logs, launchctl snapshots
   - always exits 0; degraded signals are captured as evidence
 EOF
+}
+
+print_alias_notice_if_needed() {
+  case "${INVOKED_NAME}" in
+    OCTriage|octriageunit)
+      printf 'Deprecated, use `triage`\n' >&2
+      ;;
+  esac
 }
 
 check_env() {
@@ -840,10 +1011,11 @@ proof_bundle() {
     return 1
   }
   mkdir -p "${status_dir}" || return 1
+  : > "${bundle_dir}/collector_debug.log"
 
   # ── bundle_summary.txt (always written first) ───────────────────────────────
   cat >"${bundle_dir}/bundle_summary.txt" <<EOF
-OCTriageUnit Proof Bundle
+Triage Proof Bundle
 Version: $(cat "${VERSION_FILE}" 2>/dev/null || echo "${EMBEDDED_VERSION}")
 Mode: read-only snapshot
 Generated: ${timestamp}
@@ -857,10 +1029,29 @@ EOF
     [[ -f "${collector_file}" ]] || continue
     collector_status_file="${status_dir}/$(basename "${collector_file}" .sh).status"
     (
+      collector_output_file="${status_dir}/$(basename "${collector_file}" .sh).out"
       unset COLLECTOR_ID COLLECTOR_LABEL
+      unset COLLECTOR_META_COMMAND COLLECTOR_META_EXIT_CODE COLLECTOR_META_TIMED_OUT
+      unset COLLECTOR_META_BYTES_CAPTURED COLLECTOR_META_CONFIDENCE COLLECTOR_META_ARTIFACT_STATE
+      unset COLLECTOR_META_RESULT_STATE
       unset -f collector_run 2>/dev/null || true
       source "${collector_file}"
-      collector_run "${bundle_dir}"
+      collector_run "${bundle_dir}" > "${collector_output_file}"
+      collector_rc=$?
+      cat "${collector_output_file}"
+      rm -f "${collector_output_file}" 2>/dev/null || true
+      octu_write_collector_metadata_file \
+        "${status_dir}/$(basename "${collector_file}" .sh).meta.json" \
+        "${COLLECTOR_ID:-$(basename "${collector_file}" .sh)}" \
+        "${collector_file}" \
+        "${COLLECTOR_META_COMMAND:-$(basename "${collector_file}" .sh)}" \
+        "${COLLECTOR_META_EXIT_CODE:-${collector_rc}}" \
+        "${COLLECTOR_META_TIMED_OUT:-false}" \
+        "${COLLECTOR_META_BYTES_CAPTURED:-0}" \
+        "${COLLECTOR_META_CONFIDENCE:-LOW}" \
+        "${COLLECTOR_META_ARTIFACT_STATE:-LOW_CONFIDENCE}" \
+        "${COLLECTOR_META_RESULT_STATE:-UNKNOWN}"
+      exit "${collector_rc}"
     ) > "${collector_status_file}" 2>> "${bundle_dir}/collector_debug.log" &
     collector_pids+=($!)
   done
@@ -872,6 +1063,7 @@ EOF
   fi
 
   cat "${status_dir}"/*.status > "${bundle_dir}/collector_status.txt" 2>/dev/null || true
+  cat "${status_dir}"/*.meta.json > "${bundle_dir}/collector_metadata.jsonl" 2>/dev/null || true
 
   # ── manifest.sha256 ─────────────────────────────────────────────────────────
   if command -v shasum >/dev/null 2>&1; then
@@ -893,6 +1085,8 @@ EOF
 }
 
 main() {
+  print_alias_notice_if_needed
+
   # Fast-path: share mode
   local _share=0 _redact=0 _copy=0
   for _arg in "$@"; do
@@ -978,4 +1172,6 @@ main() {
   return 0
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

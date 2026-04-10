@@ -9,6 +9,13 @@ collector_run() {
   local state="UNKNOWN"
   local note=""
   local probe_auth="SET"
+  local artifact_state="OK"
+  local confidence="HIGH"
+  local bytes_captured=0
+  local command_name="gateway_composite"
+  local status_artifact_state="OK"
+  local launchctl_artifact_state="OK"
+  local watchdog_artifact_state="OK"
 
   [[ -n "${OPENCLAW_GATEWAY_PASSWORD:-}" ]] || probe_auth="MISSING"
 
@@ -20,28 +27,27 @@ collector_run() {
     printf 'gateway.log not found at %s\n' "${gw_log}" > "${bundle_dir}/gateway_log_tail.txt"
   fi
 
-  if run_timeout "${COLLECT_TIMEOUT}" bash -lc '
+  capture_command "${bundle_dir}/openclaw_status.txt" bash -lc '
     printf "=== openclaw status ===\n"
     openclaw status 2>&1 || printf "TIMED OUT or FAILED\n"
     printf "\n=== openclaw gateway status --deep ===\n"
     openclaw gateway status --deep 2>&1 || printf "TIMED OUT or FAILED\n"
-  ' > "${bundle_dir}/openclaw_status.txt" 2>&1; then :; else
-    printf 'timeout\n' > "${bundle_dir}/openclaw_status.txt"
-  fi
+  '
+  status_artifact_state="${CAPTURE_ARTIFACT_STATE}"
 
-  if run_timeout "${COLLECT_TIMEOUT}" launchctl print "gui/$(id -u)/ai.openclaw.gateway" > "${bundle_dir}/launchctl_gateway.txt" 2>&1; then :; else
-    printf 'timeout\n' > "${bundle_dir}/launchctl_gateway.txt"
-  fi
+  capture_command "${bundle_dir}/launchctl_gateway.txt" bash -lc '
+    launchctl print "gui/'"$(id -u)"'/ai.openclaw.gateway" 2>&1 | redact_secret_stream
+  '
+  launchctl_artifact_state="${CAPTURE_ARTIFACT_STATE}"
 
-  if run_timeout "${COLLECT_TIMEOUT}" bash -lc '
+  capture_command "${bundle_dir}/launchctl_watchdog.txt" bash -lc '
     if launchctl print "gui/'"$(id -u)"'/ai.openclaw.watchdog" >/dev/null 2>&1; then
-      launchctl print "gui/'"$(id -u)"'/ai.openclaw.watchdog"
+      launchctl print "gui/'"$(id -u)"'/ai.openclaw.watchdog" 2>&1 | redact_secret_stream
     else
       printf "Service not registered: ai.openclaw.watchdog\n"
     fi
-  ' > "${bundle_dir}/launchctl_watchdog.txt" 2>&1; then :; else
-    printf 'timeout\n' > "${bundle_dir}/launchctl_watchdog.txt"
-  fi
+  '
+  watchdog_artifact_state="${CAPTURE_ARTIFACT_STATE}"
 
   if [[ -f "${gw_health_dir}/gateway_health.txt" ]]; then
     cp "${gw_health_dir}/gateway_health.txt" "${bundle_dir}/gateway_health.txt" 2>/dev/null || true
@@ -67,7 +73,28 @@ collector_run() {
     note="errlog"
   fi
 
-  printf 'collector_status id=%s state=%s note=%s probe_auth=%s\n' "$COLLECTOR_ID" "$state" "${note:-none}" "${probe_auth}"
+  artifact_state="$(octu_worst_artifact_state "${status_artifact_state}" "${launchctl_artifact_state}" "${watchdog_artifact_state}")"
+  confidence="$(octu_confidence_for_artifact_state "${artifact_state}")"
+  bytes_captured="$(octu_sum_file_bytes \
+    "${bundle_dir}/openclaw_status.txt" \
+    "${bundle_dir}/launchctl_gateway.txt" \
+    "${bundle_dir}/launchctl_watchdog.txt" \
+    "${bundle_dir}/gateway_err_tail.txt" \
+    "${bundle_dir}/gateway_log_tail.txt" \
+    "${bundle_dir}/gateway_health.txt" \
+    "${bundle_dir}/gateway_health.json" \
+    "${bundle_dir}/gateway_probe_meta.txt")"
+
+  COLLECTOR_META_COMMAND="${command_name}"
+  COLLECTOR_META_EXIT_CODE="0"
+  COLLECTOR_META_TIMED_OUT="$([[ "${artifact_state}" == TIMEOUT_* ]] && printf 'true' || printf 'false')"
+  COLLECTOR_META_BYTES_CAPTURED="${bytes_captured}"
+  COLLECTOR_META_CONFIDENCE="${confidence}"
+  COLLECTOR_META_ARTIFACT_STATE="${artifact_state}"
+  COLLECTOR_META_RESULT_STATE="${state}"
+
+  printf 'collector_status id=%s state=%s note=%s probe_auth=%s artifact_state=%s confidence=%s\n' \
+    "$COLLECTOR_ID" "$state" "${note:-none}" "${probe_auth}" "${artifact_state}" "${confidence}"
   case "$state" in
     OK) return 0 ;;
     UNKNOWN) return 20 ;;
