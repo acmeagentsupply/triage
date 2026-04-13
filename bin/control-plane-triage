@@ -12,7 +12,7 @@ set -u
 readonly BUNDLE_ROOT="${HOME}/triage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
-readonly EMBEDDED_VERSION="0.3.6"   # injected at install time if standalone
+readonly EMBEDDED_VERSION="0.3.7"   # injected at install time if standalone
 readonly COLLECT_TIMEOUT=8          # seconds; applied to each slow command
 readonly SESSIONS_TIMEOUT=15        # seconds; sessions API call can be slower on large fleets
 readonly INVOKED_NAME="$(basename "${0}")"
@@ -397,30 +397,8 @@ digest_summary() {
   fi
 }
 
-builder_summary() {
-  local label="gui/$(id -u)/ai.openclaw.digest_builder"
-  local launchctl_list
-  local launchctl_output
-  local last_exit
-  local err_log="${HOME}/.openclaw/ops/digest_builder.err.log"
-
-  launchctl_list="$(run_timeout "${COLLECT_TIMEOUT}" launchctl list 2>/dev/null || true)"
-  if ! grep -q 'ai\.openclaw\.digest_builder' <<<"${launchctl_list}"; then
-    printf 'MISSING/UNLOADED'
-    return 0
-  fi
-
-  launchctl_output="$(run_timeout "${COLLECT_TIMEOUT}" launchctl print "${label}" 2>/dev/null || true)"
-  last_exit="$(awk -F'= ' '/last exit code = / {print $2; exit} /LastExitStatus = / {print $2; exit}' <<<"${launchctl_output}" 2>/dev/null)"
-
-  if [[ -n "${last_exit}" && "${last_exit}" != "0" ]]; then
-    printf 'DEGRADED'
-  elif [[ -f "${err_log}" ]] && tail -n 200 "${err_log}" 2>/dev/null | grep -Eiq 'permission denied|no such file|syntax error|traceback|fatal|exit 1|error|failed'; then
-    printf 'DEGRADED'
-  else
-    printf 'SCHEDULED'
-  fi
-}
+# builder_summary() removed — plist-load-state check was wrong signal (Archer verdict 2026-04-13)
+# digest freshness (generated_at_utc) is the correct signal, already covered by digest_summary()
 
 disk_summary() {
   # Canonical metric: the user-visible root volume, which matches the
@@ -451,8 +429,7 @@ overall_status() {
   local gateway="$3"
   local sessions="$4"
   local digest="$5"
-  local builder="$6"
-  local disk="$7"
+  local disk="$6"
 
   if [[ "${gateway}" == FAIL* || "${gateway}" == DOWN* ]]; then
     printf 'FAILED|gateway_failure'
@@ -460,8 +437,6 @@ overall_status() {
     printf 'MEMORY SYSTEM FAILURE|digest=STALE'
   elif [[ "${disk}" == FAIL* ]]; then
     printf 'MEMORY SYSTEM FAILURE|disk=FAIL'
-  elif [[ "${builder}" == FAIL* ]]; then
-    printf 'MEMORY SYSTEM FAILURE|builder=FAIL'
   elif [[ "${verify_state}" = "MISMATCH" ]]; then
     printf 'DEGRADED|installed_mismatch'
   elif [[ "${lineage}" != "OK" && "${lineage}" != "UNKNOWN" ]]; then
@@ -470,10 +445,6 @@ overall_status() {
     printf 'DEGRADED|gateway=WARN'
   elif [[ "${sessions}" == FANOUT_ANOMALY* || "${sessions}" == HIGH_ACTIVITY* ]]; then
     printf 'DEGRADED|session_store_integrity'
-  elif [[ "${builder}" == DEGRADED* ]]; then
-    printf 'DEGRADED|builder=DEGRADED'
-  elif [[ "${builder}" == MISSING/UNLOADED* ]]; then
-    printf 'DEGRADED|builder=MISSING_UNLOADED'
   elif [[ "${sessions}" == HIGH_ACTIVITY* ]]; then
     printf 'DEGRADED|sessions=HIGH_ACTIVITY'
   elif [[ "${sessions}" == FANOUT_ANOMALY* ]]; then
@@ -683,20 +654,19 @@ EOF
 
 render_operator_brief() {
   local bundle_dir="$1"
-  local gateway sessions digest builder disk status verify_status status_with_reason reason verify_installed_sha verify_expected_sha lineage status_token
+  local gateway sessions digest disk status verify_status status_with_reason reason verify_installed_sha verify_expected_sha lineage status_token
 
   gateway="$(gateway_summary "${bundle_dir}")"
   sessions="$(sessions_summary "${bundle_dir}")"
   lineage="$(lineage_summary "${bundle_dir}")"
   digest="$(digest_summary)"
-  builder="$(builder_summary)"
   disk="$(disk_summary)"
   verify_status="$(verify_summary)"
   verify_installed_sha="${verify_status%%|*}"
   verify_status="${verify_status#*|}"
   verify_expected_sha="${verify_status%%|*}"
   verify_status="${verify_status##*|}"
-  status_with_reason="$(overall_status "${verify_status}" "${lineage}" "${gateway}" "${sessions}" "${digest}" "${builder}" "${disk}")"
+  status_with_reason="$(overall_status "${verify_status}" "${lineage}" "${gateway}" "${sessions}" "${digest}" "${disk}")"
   status="${status_with_reason%%|*}"
   reason="${status_with_reason#*|}"
   case "${status}" in
@@ -716,7 +686,6 @@ render_operator_brief() {
   render_signal_line "gateway" "${gateway}"
   render_signal_line "sessions" "${sessions}"
   render_signal_line "digest" "${digest}"
-  render_signal_line "builder" "${builder}"
   render_signal_line "disk" "${disk}"
   if ui_enabled; then
     case "${verify_status}" in

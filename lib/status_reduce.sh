@@ -316,7 +316,6 @@ octu_render_from_statuses() {
   local gateway_state gateway_note
   local sessions_state sessions_agents sessions_recent sessions_orphan sessions_total
   local digest_state
-  local builder_state
   local disk_state disk_percent
   local verify_state verify_installed_sha verify_expected_sha
   local lineage_state
@@ -335,7 +334,6 @@ octu_render_from_statuses() {
   lineage_state="$(octu_status_value "$status_file" sessions lineage)"
   sessions_confidence="$(octu_status_value "$status_file" sessions confidence)"
   digest_state="$(octu_status_value "$status_file" digest state)"
-  builder_state="$(octu_status_value "$status_file" builder state)"
   disk_state="$(octu_status_value "$status_file" disk state)"
   disk_percent="$(octu_status_value "$status_file" disk percent)"
   verify_state="$(octu_status_value "$status_file" verify state)"
@@ -345,7 +343,6 @@ octu_render_from_statuses() {
   [[ -n "$gateway_state" ]] || gateway_state="UNKNOWN"
   [[ -n "$sessions_state" ]] || sessions_state="UNKNOWN"
   [[ -n "$digest_state" ]] || digest_state="UNKNOWN"
-  [[ -n "$builder_state" ]] || builder_state="UNKNOWN"
   [[ -n "$disk_state" ]] || disk_state="UNKNOWN"
   [[ -n "$verify_state" ]] || verify_state="UNKNOWN"
   [[ -n "$lineage_state" ]] || lineage_state="UNKNOWN"
@@ -362,9 +359,6 @@ octu_render_from_statuses() {
   elif [[ "$digest_state" == STALE* ]]; then
     status="FAILED"
     reason="digest=STALE"
-  elif [[ "$builder_state" == FAIL* ]]; then
-    status="FAILED"
-    reason="builder=FAIL"
   elif [[ "$disk_state" == FAIL* ]]; then
     status="FAILED"
     reason="disk=FAIL"
@@ -383,15 +377,6 @@ octu_render_from_statuses() {
   elif [[ "$sessions_state" == FANOUT_ANOMALY* || "$sessions_state" == HIGH_ACTIVITY* ]]; then
     status="DEGRADED"
     reason="session_store_integrity"
-  elif [[ "$builder_state" == DEGRADED* ]]; then
-    status="DEGRADED"
-    reason="builder=DEGRADED"
-  elif [[ "$builder_state" == STOPPED* ]]; then
-    status="DEGRADED"
-    reason="builder=STOPPED"
-  elif [[ "$builder_state" == STALE* ]]; then
-    status="DEGRADED"
-    reason="builder=STALE"
   elif [[ "$disk_state" == WARN* ]]; then
     status="DEGRADED"
     reason="disk=WARN"
@@ -415,7 +400,6 @@ octu_render_from_statuses() {
     render_signal_line "consistency" "${contradiction}"
   fi
   render_signal_line "digest" "${digest_state}"
-  render_signal_line "builder" "${builder_state}"
   if [[ -n "$disk_percent" ]]; then
     render_signal_line "disk" "${disk_state} (${disk_percent}% used)"
   else
