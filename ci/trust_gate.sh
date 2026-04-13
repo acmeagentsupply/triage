@@ -38,6 +38,12 @@ BIN="${REPO_ROOT}/bin/control-plane-triage"
 bash "$BIN" --version 2>/dev/null | grep -q "0\." && ok "--version prints version" || fail "--version failed"
 bash "$BIN" --help   2>/dev/null | grep -q "Read-only"  && ok "--help has safety guarantees" || fail "--help missing safety guarantees"
 bash "$BIN" --self-test 2>/dev/null | grep -q "PASSED"  && ok "--self-test PASSED" || fail "--self-test FAILED"
+TMP_ALIAS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/triage-aliases.XXXXXX")"
+ln -s "${BIN}" "${TMP_ALIAS_DIR}/OCTriage"
+ln -s "${BIN}" "${TMP_ALIAS_DIR}/octriageunit"
+bash "${TMP_ALIAS_DIR}/OCTriage" --help 2>&1 | grep -q 'Deprecated, use `triage`' && ok "OCTriage alias warns" || fail "OCTriage alias missing deprecation notice"
+bash "${TMP_ALIAS_DIR}/octriageunit" --help 2>&1 | grep -q 'Deprecated, use `triage`' && ok "octriageunit alias warns" || fail "octriageunit alias missing deprecation notice"
+rm -rf "${TMP_ALIAS_DIR}"
 
 # ── 5. README consistency ────────────────────────────────────────────────────
 info "Gate 5: README consistency"

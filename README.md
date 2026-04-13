@@ -1,14 +1,16 @@
-# triage
+# Triage
 
 ![Control Plane Trusted](docs/assets/control-plane-trusted.svg) ![Read-Only Verified](docs/assets/read-only-verified.svg)
 
-`triage` is a read-only control-plane diagnostic tool for OpenClaw environments.
+`triage` is the canonical CLI for Triage, a read-only control-plane diagnostic tool for OpenClaw environments.
 
 When your gateway is degraded, `openclaw doctor` can't answer — it's asking the patient to diagnose itself. `triage` runs outside the gateway, reads directly from the filesystem and system tools, and tells you what's actually wrong.
 
 **Works when OpenClaw doesn't.**
 
 No telemetry. No mutation. No background services.
+
+`triage` is the canonical command. `OCTriage` and `octriageunit` remain available as deprecated aliases during the transition window and print `Deprecated, use \`triage\``.
 
 ---
 
@@ -30,7 +32,7 @@ The proof bundle is written to `~/triage-bundles/<timestamp>/` — real evidence
 
 ---
 
-## Why triage, not `openclaw doctor`?
+## Why Triage, not `openclaw doctor`?
 
 `openclaw doctor` checks health through the gateway. If the gateway is the problem, you get nothing useful.
 
@@ -53,7 +55,7 @@ As of v0.1.6, triage evaluates these signals:
 |--------|---------------|
 | `gateway` | Local liveness probe, healthcheck artifacts, error log context |
 | `sessions` | Agent count, session topology, orphan detection |
-| `disk` | Available disk space on the home volume |
+| `disk` | Available disk space on the canonical root volume |
 | `verify` | Installed CLI SHA vs. recorded release checksum |
 | `doctor` | Output of `openclaw doctor` (25s timeout) |
 | `compaction` | Context compaction state from the watchdog log |
@@ -162,6 +164,7 @@ curl -fsSL https://raw.githubusercontent.com/acmeagentsupply/triage/main/scripts
 | Item | Path |
 |------|------|
 | CLI binary | `/usr/local/bin/triage` (system) or `~/.local/bin/triage` (user) |
+| Deprecated aliases | `/usr/local/bin/OCTriage`, `/usr/local/bin/octriageunit` |
 | Proof bundles | `~/triage-bundles/<timestamp>/` |
 
 ---
@@ -178,6 +181,8 @@ Full trust posture: [docs/trust-doctrine.md](docs/trust-doctrine.md)
 Bundle format spec: [docs/proof-bundle-format.md](docs/proof-bundle-format.md)
 
 Quick reference: [CHEATSHEET.md](CHEATSHEET.md)
+
+Uninstall instructions: [UNINSTALL.md](UNINSTALL.md)
 
 Visual reference (print/PDF): [docs/cheatsheet-visual.html](docs/cheatsheet-visual.html)
 

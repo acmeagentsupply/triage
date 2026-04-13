@@ -9,6 +9,7 @@
 set -uo pipefail
 
 BINARY_NAME="triage"
+ALIAS_NAMES=("OCTriage" "octriageunit")
 SYSTEM_PREFIX="/usr/local/bin"
 USER_PREFIX="${HOME}/.local/bin"
 
@@ -25,6 +26,14 @@ for prefix in "${SYSTEM_PREFIX}" "${USER_PREFIX}"; do
     ok "Removed: ${dest}"
     removed=$((removed+1))
   fi
+  for alias in "${ALIAS_NAMES[@]}"; do
+    alias_path="${prefix}/${alias}"
+    if [[ -L "$alias_path" || -f "$alias_path" ]]; then
+      rm -f "$alias_path"
+      ok "Removed: ${alias_path}"
+      removed=$((removed+1))
+    fi
+  done
 done
 
 [[ $removed -eq 0 ]] && info "Nothing to remove (triage not found in standard locations)"

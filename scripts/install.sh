@@ -11,6 +11,7 @@ set -eo pipefail
 REPO="https://github.com/acmeagentsupply/triage.git"
 RAW="https://raw.githubusercontent.com/acmeagentsupply/triage/main"
 BINARY_NAME="triage"
+ALIAS_NAMES=("OCTriage" "octriageunit")
 SYSTEM_PREFIX="/usr/local/bin"
 USER_PREFIX="${HOME}/.local/bin"
 
@@ -60,10 +61,56 @@ if [[ -n "$REPO_ROOT" && -f "${REPO_ROOT}/bin/control-plane-triage" ]]; then
   SRC_BINARY="${REPO_ROOT}/bin/control-plane-triage"
 fi
 
+copy_support_file() {
+  local src="$1"
+  local dest="$2"
+  mkdir -p "$(dirname "$dest")" || die "Cannot create directory for: ${dest}"
+  cp "$src" "$dest" || die "Cannot copy support file to: ${dest}"
+}
+
+download_support_file() {
+  local rel="$1"
+  local dest="$2"
+  mkdir -p "$(dirname "$dest")" || die "Cannot create directory for: ${dest}"
+  curl -fsSL "${RAW}/${rel}" -o "$dest" 2>/dev/null || die "Download failed: ${rel}"
+}
+
+install_support_tree() {
+  local prefix="$1"
+  local root support_lib collectors_dir collector src dest
+
+  root="$(cd "${prefix}/.." && pwd)"
+  support_lib="${root}/lib"
+  collectors_dir="${support_lib}/collectors.d"
+
+  mkdir -p "${collectors_dir}" || die "Cannot create support directory: ${collectors_dir}"
+
+  if [[ -n "$REPO_ROOT" ]]; then
+    copy_support_file "${REPO_ROOT}/VERSION" "${root}/VERSION"
+    copy_support_file "${REPO_ROOT}/lib/status_reduce.sh" "${support_lib}/status_reduce.sh"
+    if [[ -f "${REPO_ROOT}/lib/format.sh" ]]; then
+      copy_support_file "${REPO_ROOT}/lib/format.sh" "${support_lib}/format.sh"
+    fi
+    while IFS= read -r src; do
+      [[ -f "${src}" ]] || continue
+      dest="${collectors_dir}/$(basename "${src}")"
+      copy_support_file "${src}" "${dest}"
+    done < <(find "${REPO_ROOT}/lib/collectors.d" -maxdepth 1 -type f -name '*.sh' | sort)
+  else
+    download_support_file "VERSION" "${root}/VERSION"
+    download_support_file "lib/status_reduce.sh" "${support_lib}/status_reduce.sh"
+    download_support_file "lib/format.sh" "${support_lib}/format.sh"
+    for collector in 10_gateway.sh 20_sessions.sh 30_digest.sh 50_disk.sh 60_verify.sh 70_doctor.sh; do
+      download_support_file "lib/collectors.d/${collector}" "${collectors_dir}/${collector}"
+    done
+  fi
+}
+
 # ── Self-test ────────────────────────────────────────────────────────────────
 
 run_self_test() {
   local bin="$1"
+  local runtime_root runtime_status runtime_collector
   info "Running self-test on installed binary..."
   bash -n "$bin" 2>/dev/null || die "Syntax check failed on installed binary"
   ok "Syntax check passed"
@@ -71,6 +118,20 @@ run_self_test() {
   ok "--version: ${ver}"
   "$bin" --help 2>/dev/null | grep -q "Read-only" || die "--help missing safety guarantees"
   ok "--help prints safety guarantees"
+  runtime_root="$(cd "$(dirname "$bin")/.." && pwd)"
+  runtime_status="${runtime_root}/lib/status_reduce.sh"
+  [[ -f "${runtime_status}" ]] || die "Missing runtime support file: ${runtime_status}"
+  for runtime_collector in 10_gateway.sh 20_sessions.sh 30_digest.sh 50_disk.sh 60_verify.sh 70_doctor.sh; do
+    [[ -f "${runtime_root}/lib/collectors.d/${runtime_collector}" ]] || die "Missing collector: ${runtime_collector}"
+  done
+  ok "Runtime support files installed"
+  local alias_path alias
+  for alias in "${ALIAS_NAMES[@]}"; do
+    alias_path="$(dirname "$bin")/${alias}"
+    [[ -L "${alias_path}" ]] || die "Missing deprecated alias: ${alias_path}"
+    "${alias_path}" --help 2>&1 | grep -q 'Deprecated, use `triage`' || die "Alias ${alias} missing deprecation notice"
+    ok "Alias ${alias} prints deprecation notice"
+  done
   ok "Self-test passed"
 }
 
@@ -105,6 +166,7 @@ do_install() {
   local prefix="$1"
   local dest="${prefix}/${BINARY_NAME}"
   local checksum_file="${dest}.sha256"
+  local alias alias_path
   local ver
 
   mkdir -p "$prefix" || die "Cannot create directory: ${prefix}"
@@ -120,9 +182,15 @@ do_install() {
     curl -fsSL "${RAW}/bin/control-plane-triage" -o "$dest" 2>/dev/null || die "Download failed"
   fi
 
+  install_support_tree "$prefix"
   chmod +x "$dest" || die "Cannot chmod: ${dest}"
+  for alias in "${ALIAS_NAMES[@]}"; do
+    alias_path="${prefix}/${alias}"
+    ln -sfn "${BINARY_NAME}" "${alias_path}" || die "Cannot create alias: ${alias_path}"
+  done
   printf '%s  %s\n' "$(sha256_file "${dest}")" "$(basename "${dest}")" > "${checksum_file}" || die "Cannot write checksum: ${checksum_file}"
   ok "Installed: ${dest}"
+  ok "Aliases:   ${prefix}/OCTriage, ${prefix}/octriageunit"
   ok "Version:   ${ver}"
   ok "SHA256:    $(sha256_file "${dest}")"
   run_self_test "$dest"
@@ -131,15 +199,35 @@ do_install() {
 
 # ── Uninstall ────────────────────────────────────────────────────────────────
 
-do_uninstall() {
+  do_uninstall() {
   local removed=0
+  local alias
   for prefix in "${SYSTEM_PREFIX}" "${USER_PREFIX}"; do
     local dest="${prefix}/${BINARY_NAME}"
     local checksum_file="${dest}.sha256"
+    local root="$(cd "${prefix}/.." && pwd)"
     if [[ -f "$dest" ]]; then
       rm -f "$dest"; ok "Removed: ${dest}"; removed=$((removed+1))
     fi
+    for alias in "${ALIAS_NAMES[@]}"; do
+      if [[ -L "${prefix}/${alias}" || -f "${prefix}/${alias}" ]]; then
+        rm -f "${prefix}/${alias}"
+        ok "Removed: ${prefix}/${alias}"
+        removed=$((removed+1))
+      fi
+    done
     [[ -f "${checksum_file}" ]] && rm -f "${checksum_file}"
+    [[ -f "${root}/VERSION" ]] && rm -f "${root}/VERSION"
+    [[ -f "${root}/lib/status_reduce.sh" ]] && rm -f "${root}/lib/status_reduce.sh"
+    [[ -f "${root}/lib/format.sh" ]] && rm -f "${root}/lib/format.sh"
+    if [[ -d "${root}/lib/collectors.d" ]]; then
+      rm -f "${root}/lib/collectors.d"/10_gateway.sh \
+            "${root}/lib/collectors.d"/20_sessions.sh \
+            "${root}/lib/collectors.d"/30_digest.sh \
+            "${root}/lib/collectors.d"/50_disk.sh \
+            "${root}/lib/collectors.d"/60_verify.sh \
+            "${root}/lib/collectors.d"/70_doctor.sh
+    fi
   done
   [[ $removed -eq 0 ]] && info "Nothing to remove (triage not found in standard locations)"
   info "Proof bundles in ~/triage-bundles/ are NOT removed (your data)"

@@ -1,6 +1,8 @@
-# triage — Cheat Sheet
+# Triage — Cheat Sheet
 
 **Read-only. No telemetry. Works when OpenClaw doesn't.**
+
+`triage` is the canonical CLI. `OCTriage` and `octriageunit` remain temporary deprecated aliases.
 
 ---
 

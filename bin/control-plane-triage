@@ -422,9 +422,9 @@ builder_summary() {
 }
 
 disk_summary() {
-  # Canonical metric: the operator's home/data volume, because that is where
-  # OpenClaw state, media, backups, and workspace files actually accumulate.
-  local disk_target="${HOME}"
+  # Canonical metric: the user-visible root volume, which matches the
+  # operator's normal `df -h /` check during incident response.
+  local disk_target="/"
   local percent avail_human oc_size
   percent="$(df -Pk "${disk_target}" 2>/dev/null | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
   avail_human="$(df -h "${disk_target}" 2>/dev/null | awk 'NR==2 {print $4}')"

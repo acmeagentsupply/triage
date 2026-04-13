@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# release_zip.sh — OCTriageUnit release packager
+# release_zip.sh — Triage release packager
 # Produces: dist/triage-<VERSION>-release.zip
 # Must run AFTER build_app.sh (requires Applications/ + dist/manifest.sha256)
 # SAFE: no installs, no network calls, no service changes.
@@ -15,11 +15,11 @@ info() { printf '  \033[34m•\033[0m %s\n' "$*"; }
 ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 die()  { printf '  \033[31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 
-printf '\n\033[1mOCTriageUnit v%s — Release Packager\033[0m\n\n' "${VERSION}"
+printf '\n\033[1mTriage v%s — Release Packager\033[0m\n\n' "${VERSION}"
 
 # Pre-flight
 [[ -f "${DIST_DIR}/manifest.sha256" ]] || die "Run build_app.sh first (missing dist/manifest.sha256)"
-[[ -d "${REPO_ROOT}/Applications/OCTriageUnit.app" ]] || die "Run build_app.sh first (missing Applications/OCTriageUnit.app)"
+[[ -d "${REPO_ROOT}/Applications/Triage.app" ]] || die "Run build_app.sh first (missing Applications/Triage.app)"
 
 mkdir -p "${DIST_DIR}"
 [[ -f "$ZIP_PATH" ]] && { info "Removing existing zip..."; rm -f "$ZIP_PATH"; }
@@ -38,7 +38,7 @@ ZIP_CONTENTS=(
   "SECURITY.md"
   "UNINSTALL.md"
   "dist/manifest.sha256"
-  "Applications/OCTriageUnit.app"
+  "Applications/Triage.app"
   "docs/"
 )
 
@@ -51,7 +51,7 @@ ok "Size:    $(du -sh "${ZIP_PATH}" | awk '{print $1}')"
 info "Verifying zip contents..."
 REQUIRED_IN_ZIP=(
   "bin/control-plane-triage"
-  "Applications/OCTriageUnit.app/"
+  "Applications/Triage.app/"
   "dist/manifest.sha256"
   "VERSION"
   "scripts/install.sh"

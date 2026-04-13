@@ -8,16 +8,20 @@ From the cloned repo:
 bash scripts/install.sh --uninstall
 ```
 
-This removes `triage` from `/usr/local/bin` and `~/.local/bin` (whichever was used). Your proof bundles in `~/triage-bundles/` are **not removed**.
+This removes `triage` and the deprecated aliases `OCTriage` and `octriageunit` from `/usr/local/bin` and `~/.local/bin` (whichever was used). Your proof bundles in `~/triage-bundles/` are **not removed**.
 
 ## Manual
 
 ```bash
 # System install
 sudo rm -f /usr/local/bin/triage
+sudo rm -f /usr/local/bin/OCTriage
+sudo rm -f /usr/local/bin/octriageunit
 
 # User install
 rm -f ~/.local/bin/triage
+rm -f ~/.local/bin/OCTriage
+rm -f ~/.local/bin/octriageunit
 ```
 
 ## Proof bundles
@@ -32,4 +36,6 @@ rm -rf ~/triage-bundles/
 
 ```bash
 which triage 2>/dev/null || echo "Removed."
+which OCTriage 2>/dev/null || echo "Removed."
+which octriageunit 2>/dev/null || echo "Removed."
 ```

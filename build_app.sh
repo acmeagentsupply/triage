@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# build_app.sh — OCTriageUnit build script
+# build_app.sh — Triage build script
 # Creates:
-#   Applications/OCTriageUnit.app   (macOS launcher wrapper)
+#   Applications/Triage.app         (macOS launcher wrapper)
 #   dist/manifest.sha256            (SHA256 of all release artifacts)
 # SAFE: no installs, no network calls, no service changes.
 
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERSION="$(cat "${REPO_ROOT}/VERSION" 2>/dev/null | tr -d '[:space:]')"
-APP_DIR="${REPO_ROOT}/Applications/OCTriageUnit.app"
+APP_DIR="${REPO_ROOT}/Applications/Triage.app"
 DIST_DIR="${REPO_ROOT}/dist"
 
 info()  { printf '  \033[34m•\033[0m %s\n' "$*"; }
@@ -20,10 +20,10 @@ sha256() {
   else sha256sum "$1" | awk '{print $1}'; fi
 }
 
-printf '\n\033[1mOCTriageUnit v%s — Build\033[0m\n\n' "${VERSION}"
+printf '\n\033[1mTriage v%s — Build\033[0m\n\n' "${VERSION}"
 
 # ── 1. macOS .app bundle ─────────────────────────────────────────────────────
-info "Building OCTriageUnit.app..."
+info "Building Triage.app..."
 rm -rf "${APP_DIR}"
 mkdir -p "${APP_DIR}/Contents/MacOS"
 mkdir -p "${APP_DIR}/Contents/Resources"
@@ -34,11 +34,11 @@ cat > "${APP_DIR}/Contents/Info.plist" << PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key>         <string>OCTriageUnit</string>
+  <key>CFBundleName</key>         <string>Triage</string>
   <key>CFBundleIdentifier</key>   <string>co.acmeagent.triage</string>
   <key>CFBundleVersion</key>      <string>${VERSION}</string>
   <key>CFBundleShortVersionString</key> <string>${VERSION}</string>
-  <key>CFBundleExecutable</key>   <string>OCTriageUnit</string>
+  <key>CFBundleExecutable</key>   <string>Triage</string>
   <key>CFBundlePackageType</key>  <string>APPL</string>
   <key>LSMinimumSystemVersion</key> <string>10.15</string>
   <key>LSUIElement</key>          <false/>
@@ -48,13 +48,13 @@ cat > "${APP_DIR}/Contents/Info.plist" << PLIST
 PLIST
 
 # macOS launcher — opens Terminal.app and runs triage
-cat > "${APP_DIR}/Contents/MacOS/OCTriageUnit" << 'LAUNCHER'
+cat > "${APP_DIR}/Contents/MacOS/Triage" << 'LAUNCHER'
 #!/usr/bin/env bash
-# OCTriageUnit.app launcher — opens a terminal and runs the CLI
+# Triage.app launcher — opens a terminal and runs the CLI
 # SAFE: read-only triage tool; no config mutation; no network calls.
 CLI="$(which triage 2>/dev/null || echo "")"
 if [[ -z "$CLI" ]]; then
-  osascript -e 'display alert "OCTriageUnit not installed" message "Run: bash scripts/install.sh\nSee https://github.com/acmeagentsupply/triage" as critical'
+  osascript -e 'display alert "Triage not installed" message "Run: bash scripts/install.sh\nSee https://github.com/acmeagentsupply/triage" as critical'
   exit 1
 fi
 osascript << 'APPLE'
@@ -64,9 +64,9 @@ tell application "Terminal"
 end tell
 APPLE
 LAUNCHER
-chmod +x "${APP_DIR}/Contents/MacOS/OCTriageUnit"
+chmod +x "${APP_DIR}/Contents/MacOS/Triage"
 
-ok "Built: Applications/OCTriageUnit.app"
+ok "Built: Applications/Triage.app"
 
 # ── 2. manifest.sha256 ───────────────────────────────────────────────────────
 info "Computing manifest.sha256..."
@@ -79,8 +79,8 @@ for f in \
   "scripts/install.sh" \
   "install.sh" \
   "VERSION" \
-  "Applications/OCTriageUnit.app/Contents/MacOS/OCTriageUnit" \
-  "Applications/OCTriageUnit.app/Contents/Info.plist"; do
+  "Applications/Triage.app/Contents/MacOS/Triage" \
+  "Applications/Triage.app/Contents/Info.plist"; do
   fp="${REPO_ROOT}/${f}"
   [[ -f "$fp" ]] || continue
   h="$(sha256 "$fp")"

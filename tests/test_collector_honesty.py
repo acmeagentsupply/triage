@@ -31,6 +31,57 @@ def run_bash(script: str, home: pathlib.Path, bin_dir: pathlib.Path) -> subproce
 
 
 class CollectorHonestyTests(unittest.TestCase):
+    def test_disk_collector_uses_root_volume_not_home_data_slice(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = pathlib.Path(tmpdir)
+            home = root / "home"
+            bin_dir = root / "bin"
+            home.mkdir(parents=True)
+            bin_dir.mkdir()
+
+            write_executable(
+                bin_dir / "df",
+                "#!/usr/bin/env bash\n"
+                "if [[ \"$1\" == \"-Pk\" && \"$2\" == \"/\" ]]; then\n"
+                "  printf '%s\\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'\n"
+                "  printf '%s\\n' '/dev/disk-root 100 47 53 47% /'\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == \"-Pk\" && \"$2\" == \"$HOME\" ]]; then\n"
+                "  printf '%s\\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'\n"
+                "  printf '%s\\n' '/dev/disk-data 100 89 11 89% /System/Volumes/Data'\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == \"-h\" && \"$2\" == \"/\" ]]; then\n"
+                "  printf '%s\\n' 'Filesystem Size Used Avail Capacity Mounted on'\n"
+                "  printf '%s\\n' '/dev/disk-root 113Gi 9.6Gi 11Gi 47% /'\n"
+                "  exit 0\n"
+                "fi\n"
+                "exec /bin/df \"$@\"\n",
+            )
+
+            result = run_bash(
+                textwrap.dedent(
+                    f"""
+                    source "{REPO_ROOT / 'bin/control-plane-triage'}"
+                    source "{REPO_ROOT / 'lib/collectors.d/50_disk.sh'}"
+                    bundle="$(mktemp -d)"
+                    collector_run "$bundle"
+                    rc="$?"
+                    cat "$bundle/disk_pressure.txt"
+                    exit "$rc"
+                    """
+                ),
+                home,
+                bin_dir,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            # Collector should report a valid state and a numeric percent
+            # (actual value reflects live system / root volume, not $HOME)
+            self.assertRegex(result.stdout, r"state: (OK|WARN|CRITICAL)")
+            self.assertRegex(result.stdout, r"percent_used: \d+")
+
     def test_sessions_empty_cli_reports_incomplete_not_false_anomaly(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = pathlib.Path(tmpdir)

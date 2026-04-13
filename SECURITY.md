@@ -2,7 +2,7 @@
 
 ## Threat Model
 
-triage is a local bash-based triage entrypoint. In its current form, it reads only enough local state to:
+Triage is a local bash-based diagnostic entrypoint. The canonical operator command is `triage`; `OCTriage` and `octriageunit` are temporary deprecated aliases. In its current form, it reads only enough local state to:
 
 - confirm that required binaries such as `launchctl` and `openclaw` are present in the operator environment
 - create a timestamped proof bundle directory under `~/triage-bundles/`

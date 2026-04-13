@@ -2,6 +2,11 @@ OPENCLAW CANONICAL SOURCE
 
 This repository is the canonical writable source for this tool.
 
+Operator-facing naming is canonicalized as:
+- Product name: `Triage`
+- Primary CLI: `triage`
+- Deprecated transition aliases: `OCTriage`, `octriageunit`
+
 Rules for agents and automation:
 	1.	All code changes must be made in this repository.
 	2.	Vendored copies located elsewhere in the OpenClaw tree are read-only.
