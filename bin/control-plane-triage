@@ -12,7 +12,7 @@ set -u
 readonly BUNDLE_ROOT="${HOME}/triage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
-readonly EMBEDDED_VERSION="0.1.6"   # injected at install time if standalone
+readonly EMBEDDED_VERSION="0.3.0"   # injected at install time if standalone
 readonly COLLECT_TIMEOUT=2          # seconds; applied to each slow command
 readonly INVOKED_NAME="$(basename "${0}")"
 OCTU_COLOR_MODE="${OCTU_COLOR_MODE:-auto}"
