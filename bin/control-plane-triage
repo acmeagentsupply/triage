@@ -12,7 +12,7 @@ set -u
 readonly BUNDLE_ROOT="${HOME}/triage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
-readonly EMBEDDED_VERSION="0.3.5"   # injected at install time if standalone
+readonly EMBEDDED_VERSION="0.3.6"   # injected at install time if standalone
 readonly COLLECT_TIMEOUT=8          # seconds; applied to each slow command
 readonly SESSIONS_TIMEOUT=15        # seconds; sessions API call can be slower on large fleets
 readonly INVOKED_NAME="$(basename "${0}")"

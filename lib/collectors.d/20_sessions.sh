@@ -85,10 +85,10 @@ EOF
     done < <(find "${sessions_dir}" -maxdepth 1 -type f -name '*.json' -print0 2>/dev/null)
   done < <(find "${sessions_root}" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
 
-  if [[ "${artifact_state}" != "OK" ]]; then
-    classification="INCOMPLETE"
-    confidence="LOW"
-  elif (( orphan > 0 || total > 50 )); then
+  # orphan count is informational only — does not drive classification (Archer verdict 2026-04-13)
+  # artifact_state != OK means API call timed out/failed — degrade confidence but still classify
+  # from file walk results rather than forcing INCOMPLETE
+  if (( total > 50 )); then
     classification="FANOUT_ANOMALY"
   elif (( recent > 10 )); then
     classification="HIGH_ACTIVITY"
@@ -96,11 +96,12 @@ EOF
     classification="NORMAL"
   fi
 
-  if [[ "${artifact_state}" = "OK" && ! -s "${cli_json}" ]]; then
-    artifact_state="LOW_CONFIDENCE"
-    classification="INCOMPLETE"
+  if [[ "${artifact_state}" != "OK" ]]; then
     confidence="LOW"
-  elif [[ "${artifact_state}" = "OK" ]]; then
+  elif [[ ! -s "${cli_json}" ]]; then
+    artifact_state="LOW_CONFIDENCE"
+    confidence="LOW"
+  else
     confidence="HIGH"
   fi
 
