@@ -12,7 +12,7 @@ set -u
 readonly BUNDLE_ROOT="${HOME}/triage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
-readonly EMBEDDED_VERSION="0.3.2"   # injected at install time if standalone
+readonly EMBEDDED_VERSION="0.3.3"   # injected at install time if standalone
 readonly COLLECT_TIMEOUT=8          # seconds; applied to each slow command
 readonly SESSIONS_TIMEOUT=15        # seconds; sessions API call can be slower on large fleets
 readonly INVOKED_NAME="$(basename "${0}")"
@@ -956,28 +956,34 @@ EOF
     fi
   fi
 
-  while IFS= read -r -d '' agent_dir; do
-    sessions_dir="${agent_dir}/sessions"
-    [[ -d "${sessions_dir}" ]] || continue
-    agents=$((agents + 1))
-    agent_name="$(basename "${agent_dir}")"
-    ref_file="${sessions_dir}/sessions.json"
-
-    while IFS= read -r -d '' session_file; do
-      [[ "$(basename "${session_file}")" = "sessions.json" ]] && continue
-      total=$((total + 1))
-      if find "${session_file}" -prune -mmin -60 | grep -q . 2>/dev/null; then
-        recent=$((recent + 1))
-      fi
-      if [[ -f "${ref_file}" ]]; then
-        if ! grep -Fq "\"$(basename "${session_file}" .json)\"" "${ref_file}" 2>/dev/null; then
+  # Cap file iteration — large fleets can have hundreds of session files
+  local iter_result
+  iter_result="$(run_timeout "${SESSIONS_TIMEOUT}" bash -c '
+    agents=0; total=0; recent=0; orphan=0
+    sessions_root="'"${sessions_root}"'"
+    while IFS= read -r -d "" agent_dir; do
+      sessions_dir="${agent_dir}/sessions"
+      [[ -d "${sessions_dir}" ]] || continue
+      agents=$((agents + 1))
+      ref_file="${sessions_dir}/sessions.json"
+      while IFS= read -r -d "" session_file; do
+        [[ "$(basename "${session_file}")" = "sessions.json" ]] && continue
+        total=$((total + 1))
+        if find "${session_file}" -prune -mmin -60 2>/dev/null | grep -q .; then
+          recent=$((recent + 1))
+        fi
+        if [[ -f "${ref_file}" ]]; then
+          if ! grep -Fq "\"$(basename "${session_file}" .jsonl)\"" "${ref_file}" 2>/dev/null; then
+            orphan=$((orphan + 1))
+          fi
+        else
           orphan=$((orphan + 1))
         fi
-      else
-        orphan=$((orphan + 1))
-      fi
-    done < <(find "${sessions_dir}" -maxdepth 1 -type f -name '*.json' -print0 2>/dev/null)
-  done < <(find "${sessions_root}" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+      done < <(find "${sessions_dir}" -maxdepth 1 -type f -name "*.jsonl" -print0 2>/dev/null)
+    done < <(find "${sessions_root}" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+    echo "${agents} ${total} ${recent} ${orphan}"
+  ' 2>/dev/null || echo "0 0 0 0")"
+  read -r agents total recent orphan <<< "${iter_result}"
 
   if (( orphan > 0 || total > 50 )); then
     classification="FANOUT_ANOMALY"
