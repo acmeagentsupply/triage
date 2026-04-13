@@ -12,8 +12,9 @@ set -u
 readonly BUNDLE_ROOT="${HOME}/triage-bundles"
 readonly SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 readonly VERSION_FILE="${SCRIPT_DIR}/../VERSION"
-readonly EMBEDDED_VERSION="0.3.1"   # injected at install time if standalone
-readonly COLLECT_TIMEOUT=30         # seconds; applied to each slow command
+readonly EMBEDDED_VERSION="0.3.2"   # injected at install time if standalone
+readonly COLLECT_TIMEOUT=8          # seconds; applied to each slow command
+readonly SESSIONS_TIMEOUT=15        # seconds; sessions API call can be slower on large fleets
 readonly INVOKED_NAME="$(basename "${0}")"
 OCTU_COLOR_MODE="${OCTU_COLOR_MODE:-auto}"
 readonly COLLECTOR_DIR="${SCRIPT_DIR}/../lib/collectors.d"
@@ -927,7 +928,7 @@ EOF
     return 0
   }
 
-  if run_timeout "${COLLECT_TIMEOUT}" openclaw sessions -json > "${cli_json}" 2>/dev/null; then
+  if run_timeout "${SESSIONS_TIMEOUT}" openclaw sessions -json > "${cli_json}" 2>/dev/null; then
     active="$(grep -Eo '"(session_id|sessionId|id)"' "${cli_json}" 2>/dev/null | wc -l | tr -d ' ')"
     [[ -n "${active}" ]] || active="unknown"
     max_children="$(grep -Eo '"parent(Id|_id)"[[:space:]]*:[[:space:]]*"[^"]+"' "${cli_json}" 2>/dev/null | sed -E 's/.*"([^"]+)"$/\1/' | sort | uniq -c | awk 'BEGIN{m=0} {if ($1>m) m=$1} END{print m+0}')"
