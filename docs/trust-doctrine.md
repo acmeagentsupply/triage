@@ -23,7 +23,7 @@ Future hooks are acceptable only when they are inert by default and activated ex
 
 ### 5. Proof-Bundle Culture
 
-Diagnostic claims should be backed by saved artifacts, not memory or console fragments. At minimum, a useful triage run should leave a bundle summary, relevant error tails, `launchctl` snapshots, doctor output, and a manifest checksum so another operator can audit what was captured.
+Diagnostic claims should be backed by saved artifacts, not memory or console fragments. At minimum, a useful triage run should leave a bundle summary, gateway health output, session topology, collector status lines, and a manifest checksum so another operator can audit what was captured.
 
 ### 6. Operator-First UX
 

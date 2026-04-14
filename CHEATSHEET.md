@@ -36,14 +36,11 @@ triage --self-test        # Verify install integrity before trusting output
 
 | Signal | What it means |
 |--------|--------------|
-| `gateway` | Is OpenClaw running and healthy? |
+| `gateway` | Is OpenClaw running and healthy? (HTTP probe via healthcheck agent) |
 | `sessions` | How many agents? Any orphans? |
+| `digest` | Is the memory system (DIGEST.md) fresh? |
 | `disk` | Enough space to keep running? |
 | `verify` | Has the triage binary been modified since install? |
-| `doctor` | What does `openclaw doctor` report? |
-| `compaction` | Is context compaction under control? |
-| `activity` | Are agents actually doing work? |
-| `fleet` | Hostname, uptime, identity |
 
 ---
 
@@ -57,8 +54,7 @@ STATUS: [HEALTHY]                ← all clear
 ```
 
 ```
-STATUS: [AT_RISK]    ← something is degraded, check signal lines above
-STATUS: [CRITICAL]   ← act now
+STATUS: [DEGRADED]   ← something needs attention, check signal lines above
 ```
 
 ---
@@ -70,10 +66,11 @@ Every run writes to `~/triage-bundles/<timestamp>/`:
 | File | What's in it |
 |------|-------------|
 | `bundle_summary.txt` | Version, timestamp, hostname |
-| `doctor_output.txt` | Full `openclaw doctor` output |
+| `gateway_health.json` | Healthcheck agent output (status, latency, reason) |
 | `gateway_err_tail.txt` | Recent gateway errors |
-| `gateway_log_tail.txt` | Last 120 lines of gateway log |
-| `openclaw_status.txt` | `openclaw status` + deep gateway check |
+| `agent_session_topology.txt` | Session counts, agents, orphan detection |
+| `collector_status.txt` | Raw per-collector status lines |
+| `collector_metadata.jsonl` | Per-collector timing, confidence, artifact state |
 | `verify_integrity.txt` | SHA comparison — installed vs. expected |
 | `manifest.sha256` | Checksums for all bundle files |
 

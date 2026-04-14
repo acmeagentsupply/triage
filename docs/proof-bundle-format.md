@@ -19,17 +19,25 @@ This file is the operator-facing index for the bundle. It should record:
 
 This file should contain the last 200 relevant lines from the gateway error stream or equivalent local error source, with noisy or obviously irrelevant lines filtered out in a documented way. The goal is to preserve recent failure context without copying an entire log file into the bundle.
 
-### `gateway_probe_meta.txt`
+### `gateway_health.json`
 
-This file records gateway probe context used during classification, including whether probe authentication material was present. It helps distinguish an authentication gap from a true local liveness failure.
+This file is copied from the healthcheck agent's output at `~/openclaw/health/gateway_health.json`. It records gateway status, HTTP response code, latency, and timestamp. The gateway collector reads this file directly — triage never probes the gateway itself.
 
-### `launchctl_snapshot.txt`
+Key fields: `status` (OK/FAIL), `reason`, `latency_ms`, `ts` (ISO8601 UTC), `probe_exit`.
 
-This file should contain a snapshot of local service state from `launchctl list`. It provides a point-in-time view of launch-managed services that can be reviewed later without rerunning commands on the host.
+If missing, the gateway collector reports `NOT_DETECTED`. If the file's mtime is older than 120s, the collector reports `STALE`.
 
-### `doctor_output.txt`
+### `agent_session_topology.txt`
 
-This file should contain the output of `openclaw doctor`. It records what the local OpenClaw diagnostic command reported at the time the bundle was created.
+This file records agent and session counts read from the sessions index. Key fields: `agents_detected`, `sessions_total`, `sessions_recent`, `orphan_transcripts`, `classification`.
+
+### `collector_status.txt`
+
+Concatenation of all collector status lines. Each line is a `collector_status id=<id> state=<state> ...` record. Used by the status reducer to compute the overall STATUS.
+
+### `collector_metadata.jsonl`
+
+One JSON object per collector recording: collector ID, command, exit code, timed-out flag, bytes captured, confidence level, artifact state, and result state. Useful for diagnosing slow or partial collectors.
 
 ### `verify_integrity.txt`
 
