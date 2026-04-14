@@ -368,6 +368,12 @@ octu_render_from_statuses() {
   elif [[ "$lineage_state" != "OK" && "$lineage_state" != "UNKNOWN" ]]; then
     status="DEGRADED"
     reason="agent_lineage"
+  elif [[ "$gateway_state" == STALE* ]]; then
+    status="DEGRADED"
+    reason="gateway=STALE"
+  elif [[ "$gateway_state" == NOT_DETECTED* ]]; then
+    status="DEGRADED"
+    reason="gateway=NOT_DETECTED"
   elif [[ "$gateway_state" == WARN* ]]; then
     status="DEGRADED"
     reason="gateway=WARN"
