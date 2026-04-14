@@ -49,18 +49,13 @@ It's also read-only. There's no risk to running it in a degraded production envi
 
 ## What It Checks
 
-As of v0.1.6, triage evaluates these signals:
-
 | Signal | What it checks |
 |--------|---------------|
-| `gateway` | Local liveness probe, healthcheck artifacts, error log context |
+| `gateway` | HTTP liveness probe via healthcheck agent — no CLI, no WebSocket |
 | `sessions` | Agent count, session topology, orphan detection |
-| `disk` | Available disk space on the canonical root volume |
+| `digest` | DIGEST.md freshness — memory system health |
+| `disk` | Available disk space on the canonical root volume (`/`) |
 | `verify` | Installed CLI SHA vs. recorded release checksum |
-| `doctor` | Output of `openclaw doctor` (25s timeout) |
-| `compaction` | Context compaction state from the watchdog log |
-| `activity` | Recent event rate across the agent fleet |
-| `fleet` | Hostname and uptime identity |
 
 ---
 
@@ -78,15 +73,12 @@ STATUS: [HEALTHY]
 A degraded system:
 
 ```
-gateway: DEGRADED (no healthcheck artifact)
-sessions: ORPHAN_DETECTED (agents=3, orphans=1)
-disk: WARNING (available=2.1GB)
-STATUS: [AT_RISK]
+! gateway: WARN (timeout_12s)
+! disk: WARN (84% used)
+STATUS: [DEGRADED] (disk=WARN)
 ```
 
-`AT_RISK` means something is degrading but the system is still running. `CRITICAL` means act now.
-
-The value of `AT_RISK`: triage catches risk *before* failure, not just after. Run it regularly, not just when something breaks.
+Run it regularly, not just when something breaks.
 
 ---
 
@@ -97,17 +89,39 @@ Every run writes a timestamped bundle to `~/triage-bundles/`:
 | File | Contents |
 |------|----------|
 | `bundle_summary.txt` | Version, timestamp, hostname |
-| `doctor_output.txt` | `openclaw doctor` output (25s timeout) |
+| `gateway_health.json` | Copied from healthcheck agent output |
 | `gateway_err_tail.txt` | Filtered tail of `gateway.err.log` |
-| `gateway_log_tail.txt` | Last 120 lines of `gateway.log` |
-| `openclaw_status.txt` | `openclaw status` + `gateway status --deep` |
-| `launchctl_gateway.txt` | `launchctl print` for gateway service |
-| `launchctl_watchdog.txt` | `launchctl print` for watchdog service |
-| `gateway_health.txt/json` | Copied from healthcheck agent output |
+| `agent_session_topology.txt` | Session counts, agent list, orphan detection |
 | `verify_integrity.txt` | Installed SHA, expected SHA, verify state |
+| `collector_status.txt` | Raw collector output lines |
+| `collector_metadata.jsonl` | Per-collector timing, confidence, artifact state |
 | `manifest.sha256` | SHA-256 checksums of all bundle artifacts |
 
 **Using the bundle:** Paste contents into a support ticket, or send to an AI assistant with "here's my triage bundle, what's wrong?" The bundle format is designed for both.
+
+---
+
+## Gateway Healthcheck Setup
+
+The `gateway` collector reads a health file written by a background healthcheck agent. Without it, triage reports `gateway: NOT_DETECTED`.
+
+The healthcheck agent must set `OPENCLAW_GATEWAY_URL` to the local gateway address. Example launchd plist snippet:
+
+```xml
+<key>OPENCLAW_GATEWAY_URL</key>
+<string>http://127.0.0.1:18789</string>
+```
+
+Triage never probes the gateway itself — it reads the file the healthcheck agent writes. This keeps triage fast (sub-2s) and avoids WebSocket overhead.
+
+**Gateway states:**
+
+| State | Meaning |
+|-------|---------|
+| `OK` | Health file fresh, gateway responded with HTTP 2xx/3xx/4xx/5xx |
+| `WARN` | Health file fresh but probe reported failure |
+| `STALE` | Health file older than 120s — healthcheck agent may be stuck |
+| `NOT_DETECTED` | Health file missing — healthcheck agent not running or `OPENCLAW_GATEWAY_URL` not set |
 
 ---
 
