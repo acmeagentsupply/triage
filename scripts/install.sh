@@ -100,7 +100,7 @@ install_support_tree() {
     download_support_file "VERSION" "${root}/VERSION"
     download_support_file "lib/status_reduce.sh" "${support_lib}/status_reduce.sh"
     download_support_file "lib/format.sh" "${support_lib}/format.sh"
-    for collector in 10_gateway.sh 20_sessions.sh 30_digest.sh 50_disk.sh 60_verify.sh 70_doctor.sh; do
+    for collector in 10_gateway.sh 20_sessions.sh 30_digest.sh 50_disk.sh 60_verify.sh; do
       download_support_file "lib/collectors.d/${collector}" "${collectors_dir}/${collector}"
     done
   fi
@@ -121,7 +121,7 @@ run_self_test() {
   runtime_root="$(cd "$(dirname "$bin")/.." && pwd)"
   runtime_status="${runtime_root}/lib/status_reduce.sh"
   [[ -f "${runtime_status}" ]] || die "Missing runtime support file: ${runtime_status}"
-  for runtime_collector in 10_gateway.sh 20_sessions.sh 30_digest.sh 50_disk.sh 60_verify.sh 70_doctor.sh; do
+  for runtime_collector in 10_gateway.sh 20_sessions.sh 30_digest.sh 50_disk.sh 60_verify.sh; do
     [[ -f "${runtime_root}/lib/collectors.d/${runtime_collector}" ]] || die "Missing collector: ${runtime_collector}"
   done
   ok "Runtime support files installed"
@@ -226,7 +226,8 @@ do_install() {
             "${root}/lib/collectors.d"/30_digest.sh \
             "${root}/lib/collectors.d"/50_disk.sh \
             "${root}/lib/collectors.d"/60_verify.sh \
-            "${root}/lib/collectors.d"/70_doctor.sh
+            "${root}/lib/collectors.d"/70_doctor.sh \
+            "${root}/lib/collectors.d"/70_doctor.sh.retired
     fi
   done
   [[ $removed -eq 0 ]] && info "Nothing to remove (triage not found in standard locations)"
